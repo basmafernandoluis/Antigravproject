@@ -3,14 +3,13 @@ export const IS_TESTING_ADS = import.meta.env.DEV;
 
 export const ADMOB_TEST_IDS = {
   interstitial: 'ca-app-pub-3940256099942544/1033173712',
-  rewardedInterstitial: 'ca-app-pub-3940256099942544/5354046379',
   rewarded: 'ca-app-pub-3940256099942544/5224354917',
 };
 
 export const ADMOB_PROD_IDS = {
   appId: 'ca-app-pub-7435856398879419~2712207989',
   interstitial: 'ca-app-pub-7435856398879419/6483932030',
-  rewardedInterstitial: 'ca-app-pub-7435856398879419/4872622413',
+  rewarded: 'ca-app-pub-7435856398879419/1703533592',
 };
 
 export const AD_UNIT_IDS = IS_TESTING_ADS ? ADMOB_TEST_IDS : ADMOB_PROD_IDS;
