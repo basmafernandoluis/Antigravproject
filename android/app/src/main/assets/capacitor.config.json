@@ -2,6 +2,7 @@
 	"appId": "com.appwizards.juicydrop",
 	"appName": "Juicy Drop",
 	"webDir": "dist",
+	"backgroundColor": "#13152e",
 	"server": {
 		"androidScheme": "https"
 	}

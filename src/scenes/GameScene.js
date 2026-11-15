@@ -232,6 +232,21 @@ export default class GameScene extends Phaser.Scene {
       this.muteBtn.setText(muted ? '🔇' : '🔊');
     });
 
+    // Settings Button
+    this.settingsBtn = this.add
+      .text(GAME_WIDTH - 190, 26, '⚙️', {
+        fontSize: '21px',
+      })
+      .setOrigin(0.5, 0)
+      .setInteractive({ useHandCursor: true });
+
+    this.settingsBtn.on('pointerdown', (pointer) => {
+      pointer.event?.stopPropagation?.();
+      if (!this.isGameOver) {
+        this.openSettingsModal();
+      }
+    });
+
     // Rewarded Booster Pills (Secouer & Épingle)
     this.createBoosterButtons();
 
@@ -951,6 +966,102 @@ export default class GameScene extends Phaser.Scene {
         this.prepareNextDrop();
       },
       onDismiss: () => this.resumeFromAd(),
+    });
+  }
+
+  openSettingsModal() {
+    if (this.settingsOpen || this.isGameOver) return;
+    this.settingsOpen = true;
+    this.canDrop = false;
+    this.matter.world.pause();
+
+    const overlay = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.75)
+      .setDepth(30)
+      .setInteractive();
+
+    const card = this.add
+      .container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+      .setDepth(35)
+      .setScale(0.75)
+      .setAlpha(0);
+
+    const cardBg = this.add.graphics();
+    cardBg.fillStyle(0x1b1e3f, 1);
+    cardBg.fillRoundedRect(-170, -185, 340, 370, 24);
+    cardBg.lineStyle(2.5, 0x8ecae6, 0.7);
+    cardBg.strokeRoundedRect(-170, -185, 340, 370, 24);
+
+    const title = this.add
+      .text(0, -145, 'RÉGLAGES', {
+        fontSize: '24px',
+        fontStyle: '900',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5);
+
+    const maxFruitName = FRUITS[storageManager.getMaxTierReached()]?.name || 'Cerise';
+    const statsText = this.add
+      .text(
+        0,
+        -98,
+        `Parties : ${storageManager.getGamesPlayed()}   •   Fruit max : ${maxFruitName}`,
+        {
+          fontSize: '13px',
+          fontStyle: 'bold',
+          color: '#ffd166',
+        }
+      )
+      .setOrigin(0.5);
+
+    const closeModal = () => {
+      overlay.destroy();
+      card.destroy();
+      this.settingsOpen = false;
+      this.canDrop = true;
+      this.matter.world.resume();
+    };
+
+    const soundBtn = this.makeModalButton(
+      0,
+      -40,
+      soundFX.muted ? '🔇  SON : COUPÉ' : '🔊  SON : ACTIVÉ',
+      0x3a0ca3,
+      '#ffffff',
+      () => {
+        const muted = soundFX.toggleMute();
+        this.muteBtn.setText(muted ? '🔇' : '🔊');
+        const labelObj = soundBtn.getAt(1);
+        labelObj.setText(muted ? '🔇  SON : COUPÉ' : '🔊  SON : ACTIVÉ');
+      }
+    );
+
+    const restartBtn = this.makeModalButton(0, 22, '↻  RECOMMENCER', 0xff9f1c, '#0b132b', () => {
+      closeModal();
+      this.scene.restart();
+    });
+
+    const privacyBtn = this.makeModalButton(
+      0,
+      84,
+      '🔒  CONFIDENTIALITÉ (RGPD)',
+      0x2b2d42,
+      '#ffffff',
+      () => {
+        adManager.showPrivacyOptions();
+      }
+    );
+
+    const resumeBtn = this.makeModalButton(0, 146, '▶  REPRENDRE', 0x06d6a0, '#0b132b', closeModal);
+
+    card.add([cardBg, title, statsText, soundBtn, restartBtn, privacyBtn, resumeBtn]);
+
+    this.tweens.add({
+      targets: card,
+      scale: 1,
+      alpha: 1,
+      duration: 200,
+      ease: 'Back.easeOut',
     });
   }
 }

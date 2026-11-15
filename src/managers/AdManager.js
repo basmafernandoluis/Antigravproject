@@ -57,6 +57,15 @@ class AdManager {
     }
   }
 
+  async showPrivacyOptions() {
+    if (!this.isNative()) return;
+    try {
+      await AdMob.showPrivacyOptionsForm();
+    } catch (err) {
+      console.warn('[AdManager] Privacy options form unavailable:', err);
+    }
+  }
+
   async preloadInterstitial() {
     if (!this.isNative() || storageManager.isNoAds()) return;
     try {
