@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
 import { FRUITS, MAX_SPAWN_TIER } from '../config/fruits.js';
+import { AD_RULES } from '../config/ads.js';
 import { generateGameTextures } from '../utils/textures.js';
 import { soundFX } from '../utils/sound.js';
+import { adManager } from '../managers/AdManager.js';
+import { storageManager } from '../managers/StorageManager.js';
 
 const GAME_WIDTH = 480;
 const GAME_HEIGHT = 854;
@@ -24,15 +27,20 @@ export default class GameScene extends Phaser.Scene {
 
   create() {
     generateGameTextures(this);
+    adManager.init();
 
     this.score = 0;
-    this.bestScore = Number(localStorage.getItem('juicy_drop_best') || 0);
+    this.bestScore = storageManager.getBestScore();
     this.isGameOver = false;
     this.canDrop = true;
+    this.pinMode = false;
+    this.continuesUsed = 0;
+    this.scoreDoubled = false;
     this.comboCount = 0;
     this.lastMergeTime = 0;
     this.dangerTimer = 0;
     this.fruits = [];
+    this.gameOverObjects = [];
 
     // World bounds (walls)
     this.matter.world.setBounds(0, -200, GAME_WIDTH, GAME_HEIGHT + 300, 32, false, false, false, false);
@@ -212,7 +220,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Sound Mute Button
     this.muteBtn = this.add
-      .text(GAME_WIDTH - 156, 56, soundFX.muted ? '🔇' : '🔊', {
+      .text(GAME_WIDTH - 156, 26, soundFX.muted ? '🔇' : '🔊', {
         fontSize: '22px',
       })
       .setOrigin(0.5, 0)
@@ -224,12 +232,59 @@ export default class GameScene extends Phaser.Scene {
       this.muteBtn.setText(muted ? '🔇' : '🔊');
     });
 
+    // Rewarded Booster Pills (Secouer & Épingle)
+    this.createBoosterButtons();
+
+    // Pin Mode Hint Banner
+    this.pinBanner = this.add
+      .text(GAME_WIDTH / 2, DROP_Y - 26, '📌 TOUCHEZ UN FRUIT À DÉTRUIRE', {
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#ffd166',
+        backgroundColor: '#1b1e3f',
+        padding: { x: 10, y: 5 },
+      })
+      .setOrigin(0.5)
+      .setDepth(15)
+      .setVisible(false);
+
     // Aiming Guide Line + Preview Fruit
     this.aimLine = this.add.graphics();
     this.dropperFruit = this.add.image(GAME_WIDTH / 2, DROP_Y, 'fruit_0').setDepth(5);
 
     // Bottom Evolution Legend (11 fruits mini-bar)
     this.createEvolutionBar();
+  }
+
+  createBoosterButtons() {
+    const makePill = (x, y, label, bgColor, onClick) => {
+      const container = this.add.container(x, y).setDepth(12);
+      const bg = this.add.graphics();
+      bg.fillStyle(bgColor, 0.92);
+      bg.fillRoundedRect(-62, -16, 124, 32, 16);
+      bg.lineStyle(1.5, 0xffffff, 0.28);
+      bg.strokeRoundedRect(-62, -16, 124, 32, 16);
+
+      const txt = this.add
+        .text(0, 0, label, {
+          fontSize: '12px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+        })
+        .setOrigin(0.5);
+
+      const zone = this.add.zone(0, 0, 124, 32).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', (pointer) => {
+        pointer.event?.stopPropagation?.();
+        onClick();
+      });
+
+      container.add([bg, txt, zone]);
+      return container;
+    };
+
+    makePill(262, 66, '🎬 SECOUER', 0x5a189a, () => this.triggerShakeBooster());
+    makePill(262, 104, '🎬 ÉPINGLE', 0xc9184a, () => this.triggerPinBooster());
   }
 
   createEvolutionBar() {
@@ -252,7 +307,7 @@ export default class GameScene extends Phaser.Scene {
     this.aimX = GAME_WIDTH / 2;
 
     const updateAim = (pointerX) => {
-      if (this.isGameOver || !this.canDrop) return;
+      if (this.isGameOver || !this.canDrop || this.pinMode) return;
       const r = FRUITS[this.currentTier].radius;
       this.aimX = Phaser.Math.Clamp(pointerX, JAR_LEFT + r + 4, JAR_RIGHT - r - 4);
       this.dropperFruit.x = this.aimX;
@@ -264,15 +319,21 @@ export default class GameScene extends Phaser.Scene {
     });
 
     this.input.on('pointerdown', (pointer) => {
-      if (this.isGameOver || !this.canDrop) return;
-      // Ignore if clicking mute button area
-      if (pointer.y < 100 && pointer.x > GAME_WIDTH - 180 && pointer.x < GAME_WIDTH - 130) return;
+      if (this.isGameOver) return;
+      if (pointer.y < 128) return; // Ignore top HUD & booster clicks
+
+      if (this.pinMode) {
+        this.tryPopFruitAt(pointer.x, pointer.y);
+        return;
+      }
+
+      if (!this.canDrop) return;
       updateAim(pointer.x);
     });
 
     this.input.on('pointerup', (pointer) => {
-      if (this.isGameOver || !this.canDrop) return;
-      if (pointer.y < 100 && pointer.x > GAME_WIDTH - 180 && pointer.x < GAME_WIDTH - 130) return;
+      if (this.isGameOver || this.pinMode || !this.canDrop) return;
+      if (pointer.y < 128) return;
       updateAim(pointer.x);
       this.dropCurrentFruit();
     });
@@ -425,11 +486,11 @@ export default class GameScene extends Phaser.Scene {
       yoyo: true,
     });
 
-    if (this.score > this.bestScore) {
+    if (storageManager.updateBestScore(this.score)) {
       this.bestScore = this.score;
       this.bestText.setText(`MAX ${this.bestScore}`);
-      localStorage.setItem('juicy_drop_best', String(this.bestScore));
     }
+    storageManager.updateMaxTier(nextTier);
 
     // Spawn upgraded fruit
     this.spawnPhysicsFruit(midX, midY, nextTier, true);
@@ -562,36 +623,136 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  pauseForAd() {
+    this.matter.world.pause();
+    this.wasMutedBeforeAd = soundFX.muted;
+    if (!this.wasMutedBeforeAd) {
+      soundFX.muted = true;
+    }
+  }
+
+  resumeFromAd() {
+    this.matter.world.resume();
+    soundFX.muted = this.wasMutedBeforeAd ?? false;
+  }
+
+  triggerShakeBooster() {
+    if (this.isGameOver || this.fruits.length === 0 || adManager.isShowingAd) return;
+
+    adManager.showRewarded({
+      onStart: () => this.pauseForAd(),
+      onReward: () => {
+        this.cameras.main.shake(280, 0.016);
+        for (const fruit of this.fruits) {
+          if (!fruit.active) continue;
+          fruit.setVelocity(
+            Phaser.Math.FloatBetween(-6, 6),
+            Phaser.Math.FloatBetween(-9, -4)
+          );
+        }
+        this.spawnConfetti(GAME_WIDTH / 2, JAR_TOP + 60, 20);
+      },
+      onDismiss: () => this.resumeFromAd(),
+    });
+  }
+
+  triggerPinBooster() {
+    if (this.isGameOver || this.fruits.length === 0 || this.pinMode || adManager.isShowingAd) return;
+
+    adManager.showRewarded({
+      onStart: () => this.pauseForAd(),
+      onReward: () => {
+        this.pinMode = true;
+        this.canDrop = false;
+        this.aimLine.clear();
+        this.dropperFruit.setVisible(false);
+        this.pinBanner.setVisible(true);
+      },
+      onDismiss: () => this.resumeFromAd(),
+    });
+  }
+
+  tryPopFruitAt(px, py) {
+    let target = null;
+    let minDist = Infinity;
+
+    for (const fruit of this.fruits) {
+      if (!fruit.active) continue;
+      const tier = fruit.getData('tier');
+      const r = FRUITS[tier].radius;
+      const d = Phaser.Math.Distance.Between(px, py, fruit.x, fruit.y);
+      if (d <= r + 14 && d < minDist) {
+        minDist = d;
+        target = fruit;
+      }
+    }
+
+    if (!target) return;
+
+    const fx = target.x;
+    const fy = target.y;
+    const tier = target.getData('tier');
+
+    this.fruits = this.fruits.filter((f) => f !== target);
+    target.destroy();
+
+    soundFX.playMerge(tier, 1);
+    this.cameras.main.shake(150, 0.01);
+    this.spawnConfetti(fx, fy, 18);
+
+    this.pinMode = false;
+    this.pinBanner.setVisible(false);
+    this.canDrop = true;
+    this.dropperFruit.setVisible(true);
+    this.drawAimLine();
+  }
+
   triggerGameOver() {
     this.isGameOver = true;
     this.canDrop = false;
+    this.pinMode = false;
+    this.pinBanner.setVisible(false);
     this.aimLine.clear();
     this.dropperFruit.setVisible(false);
     this.dangerBarBg.setVisible(false);
     this.dangerBarFill.setVisible(false);
 
+    storageManager.incrementGamesPlayed();
     soundFX.playGameOver();
     this.cameras.main.shake(300, 0.015);
 
     // Darken backdrop
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0).setDepth(20);
+    const overlay = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0)
+      .setDepth(20);
     this.tweens.add({
       targets: overlay,
       fillAlpha: 0.78,
       duration: 220,
     });
 
+    const canContinue =
+      this.continuesUsed < AD_RULES.MAX_CONTINUES_PER_GAME && this.fruits.length > 0;
+    const canDoubleScore = !this.scoreDoubled && this.score > 0;
+
     // Modal Card
-    const card = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2).setDepth(25).setScale(0.6).setAlpha(0);
+    const card = this.add
+      .container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+      .setDepth(25)
+      .setScale(0.6)
+      .setAlpha(0);
+
+    const cardH = canContinue ? 385 : 330;
+    const cardTop = -cardH / 2;
 
     const cardBg = this.add.graphics();
     cardBg.fillStyle(0x1b1e3f, 1);
-    cardBg.fillRoundedRect(-165, -145, 330, 290, 24);
+    cardBg.fillRoundedRect(-170, cardTop, 340, cardH, 24);
     cardBg.lineStyle(3, 0xff3b5c, 0.8);
-    cardBg.strokeRoundedRect(-165, -145, 330, 290, 24);
+    cardBg.strokeRoundedRect(-170, cardTop, 340, cardH, 24);
 
     const title = this.add
-      .text(0, -102, 'GAME OVER !', {
+      .text(0, cardTop + 42, 'GAME OVER !', {
         fontSize: '30px',
         fontStyle: '900',
         color: '#ff3b5c',
@@ -599,50 +760,80 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const scoreLbl = this.add
-      .text(0, -45, 'SCORE FINAL', {
-        fontSize: '13px',
+      .text(0, cardTop + 88, 'SCORE FINAL', {
+        fontSize: '12px',
         fontStyle: 'bold',
         color: '#a5b4fc',
       })
       .setOrigin(0.5);
 
     const scoreVal = this.add
-      .text(0, -10, String(this.score), {
-        fontSize: '42px',
+      .text(0, cardTop + 122, String(this.score), {
+        fontSize: '40px',
         fontStyle: '900',
         color: '#ffffff',
       })
       .setOrigin(0.5);
 
     const bestVal = this.add
-      .text(0, 32, `RECORD : ${this.bestScore}`, {
-        fontSize: '15px',
+      .text(0, cardTop + 160, `RECORD : ${this.bestScore}`, {
+        fontSize: '14px',
         fontStyle: 'bold',
         color: '#ffd166',
       })
       .setOrigin(0.5);
 
-    // Instant "REJOUER" Button
-    const btnBg = this.add.graphics();
-    btnBg.fillStyle(0x06d6a0, 1);
-    btnBg.fillRoundedRect(-115, 62, 230, 56, 28);
-    btnBg.lineStyle(2, 0xffffff, 0.35);
-    btnBg.strokeRoundedRect(-115, 62, 230, 56, 28);
+    card.add([cardBg, title, scoreLbl, scoreVal, bestVal]);
 
-    const btnText = this.add
-      .text(0, 90, '↻  REJOUER', {
-        fontSize: '22px',
-        fontStyle: '900',
-        color: '#0b132b',
-      })
-      .setOrigin(0.5);
+    let nextY = cardTop + 205;
 
-    const hitZone = this.add.zone(0, 90, 230, 56).setInteractive({ useHandCursor: true });
-    hitZone.on('pointerdown', () => {
-      this.scene.restart();
+    // 1. Rewarded Continue (1x per game)
+    if (canContinue) {
+      const contBtn = this.makeModalButton(0, nextY, '🎬  CONTINUER (1x)', 0xff9f1c, '#0b132b', () => {
+        this.handleContinue();
+      });
+      card.add(contBtn);
+      nextY += 58;
+    }
+
+    // 2. Rewarded Score x2
+    if (canDoubleScore) {
+      const x2Btn = this.makeModalButton(0, nextY, '🎬  SCORE x2', 0x7209b7, '#ffffff', () => {
+        adManager.showRewarded({
+          onStart: () => this.pauseForAd(),
+          onReward: () => {
+            this.scoreDoubled = true;
+            this.score *= 2;
+            this.scoreText.setText(String(this.score));
+            scoreVal.setText(String(this.score));
+            if (storageManager.updateBestScore(this.score)) {
+              this.bestScore = this.score;
+              this.bestText.setText(`MAX ${this.bestScore}`);
+              bestVal.setText(`RECORD : ${this.bestScore}`);
+            }
+            x2Btn.destroy();
+            this.spawnConfetti(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, 35);
+          },
+          onDismiss: () => this.resumeFromAd(),
+        });
+      });
+      card.add(x2Btn);
+      nextY += 58;
+    }
+
+    // 3. Instant "REJOUER" Button (triggers Interstitial if eligible)
+    const replayBtn = this.makeModalButton(0, nextY, '↻  REJOUER', 0x06d6a0, '#0b132b', () => {
+      adManager.showInterstitialIfEligible({
+        onStart: () => this.pauseForAd(),
+        onDismiss: () => {
+          this.resumeFromAd();
+          this.scene.restart();
+        },
+      });
     });
+    card.add(replayBtn);
 
-    card.add([cardBg, title, scoreLbl, scoreVal, bestVal, btnBg, btnText, hitZone]);
+    this.gameOverObjects = [overlay, card];
 
     this.tweens.add({
       targets: card,
@@ -652,9 +843,60 @@ export default class GameScene extends Phaser.Scene {
       ease: 'Back.easeOut',
     });
 
-    // Celebrate if score > 0 with a celebratory confetti burst
+    // Celebrate if new record
     if (this.score > 0 && this.score >= this.bestScore) {
       this.spawnConfetti(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, 40);
     }
+  }
+
+  makeModalButton(x, y, label, bgColor, textColor, onClick) {
+    const container = this.add.container(x, y);
+    const bg = this.add.graphics();
+    bg.fillStyle(bgColor, 1);
+    bg.fillRoundedRect(-125, -24, 250, 48, 24);
+    bg.lineStyle(2, 0xffffff, 0.35);
+    bg.strokeRoundedRect(-125, -24, 250, 48, 24);
+
+    const txt = this.add
+      .text(0, 0, label, {
+        fontSize: '17px',
+        fontStyle: '900',
+        color: textColor,
+      })
+      .setOrigin(0.5);
+
+    const zone = this.add.zone(0, 0, 250, 48).setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', onClick);
+
+    container.add([bg, txt, zone]);
+    return container;
+  }
+
+  handleContinue() {
+    adManager.showRewarded({
+      onStart: () => this.pauseForAd(),
+      onReward: () => {
+        this.continuesUsed += 1;
+
+        // Destroy up to 4 highest fruits (smallest Y)
+        const sorted = [...this.fruits].filter((f) => f.active).sort((a, b) => a.y - b.y);
+        const toRemove = sorted.slice(0, 4);
+        for (const f of toRemove) {
+          this.spawnConfetti(f.x, f.y, 12);
+          this.fruits = this.fruits.filter((item) => item !== f);
+          f.destroy();
+        }
+
+        // Clear Game Over UI and resume
+        for (const obj of this.gameOverObjects) {
+          obj.destroy();
+        }
+        this.gameOverObjects = [];
+        this.dangerTimer = 0;
+        this.isGameOver = false;
+        this.prepareNextDrop();
+      },
+      onDismiss: () => this.resumeFromAd(),
+    });
   }
 }
