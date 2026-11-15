@@ -614,17 +614,15 @@ export default class GameScene extends Phaser.Scene {
     const shakeDuration = Math.min(280, 100 + nextTier * 16);
     this.cameras.main.shake(shakeDuration, shakeIntensity);
 
-    if (nextTier >= 5 || this.comboCount >= 3) {
-      this.cameras.main.flash(140, 255, 240, 200, false);
-    }
-
-    // 2. Additive Merge Flash Glow
-    const glow = this.add.circle(midX, midY, FRUITS[nextTier].radius * 0.9, 0xffffff, 0.85).setDepth(6);
+    // 2. Soft local Merge Glow (tinted to fruit color, no full-screen flash)
+    const glow = this.add
+      .circle(midX, midY, FRUITS[nextTier].radius * 0.85, FRUITS[nextTier].highlight, 0.45)
+      .setDepth(6);
     this.tweens.add({
       targets: glow,
-      scale: 1.6,
+      scale: 1.45,
       alpha: 0,
-      duration: 180,
+      duration: 160,
       ease: 'Cubic.easeOut',
       onComplete: () => glow.destroy(),
     });
