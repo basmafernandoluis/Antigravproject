@@ -753,7 +753,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update(_time, delta) {
-    if (this.isGameOver) return;
+    if (this.isGameOver || this.isPausedForAd || this.pinMode || this.settingsOpen) return;
 
     const now = this.time.now;
     let overflowing = false;
@@ -798,6 +798,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   pauseForAd() {
+    this.isPausedForAd = true;
     this.matter.world.pause();
     this.wasMutedBeforeAd = soundFX.muted;
     if (!this.wasMutedBeforeAd) {
@@ -806,6 +807,8 @@ export default class GameScene extends Phaser.Scene {
   }
 
   resumeFromAd() {
+    this.isPausedForAd = false;
+    this.dangerTimer = 0;
     this.matter.world.resume();
     soundFX.muted = this.wasMutedBeforeAd ?? false;
   }
