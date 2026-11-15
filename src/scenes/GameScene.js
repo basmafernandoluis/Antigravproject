@@ -12,11 +12,11 @@ const GAME_HEIGHT = 854;
 // Container / Jar geometry
 const JAR_LEFT = 36;
 const JAR_RIGHT = 444;
-const JAR_TOP = 215;
-const JAR_BOTTOM = 770;
+const JAR_TOP = 246;
+const JAR_BOTTOM = 776;
 const WALL_THICKNESS = 24;
-const DANGER_Y = 245;
-const DROP_Y = 165;
+const DANGER_Y = 276;
+const DROP_Y = 196;
 
 const CONFETTI_COLORS = [0xff3b5c, 0xffd166, 0x06d6a0, 0x118ab2, 0x9b5de5, 0xff7b00];
 
@@ -303,7 +303,7 @@ export default class GameScene extends Phaser.Scene {
     const makeArcadePill = (x, y, label, fillColor, lipColor, onClick) => {
       const container = this.add.container(x, y).setDepth(12);
       const w = 148;
-      const h = 30;
+      const h = 31;
       const bg = this.add.graphics();
       // 3D bottom lip
       bg.fillStyle(lipColor, 1);
@@ -311,20 +311,18 @@ export default class GameScene extends Phaser.Scene {
       // Main pill body
       bg.fillStyle(fillColor, 1);
       bg.fillRoundedRect(-w / 2, -h / 2, w, h, 15);
-      // Top glossy highlight
-      bg.fillStyle(0xffffff, 0.22);
-      bg.fillRoundedRect(-w / 2 + 6, -h / 2 + 2, w - 12, 8, 4);
+      // Subtle top glossy highlight
+      bg.fillStyle(0xffffff, 0.14);
+      bg.fillRoundedRect(-w / 2 + 8, -h / 2 + 2, w - 16, 7, 3);
       // Crisp border
-      bg.lineStyle(1.5, 0xffffff, 0.35);
+      bg.lineStyle(1.5, 0xffffff, 0.4);
       bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 15);
 
       const txt = this.add
-        .text(0, -1, label, {
-          fontSize: '13px',
+        .text(0, 0, label, {
+          fontSize: '14px',
           fontStyle: '900',
           color: '#ffffff',
-          stroke: '#0d0e22',
-          strokeThickness: 2,
         })
         .setOrigin(0.5);
 
@@ -340,7 +338,7 @@ export default class GameScene extends Phaser.Scene {
       return container;
     };
 
-    makeArcadePill(274, 89, '🎬 SECOUER', 0x7b2cbf, 0x3c096c, () => this.triggerShakeBooster());
+    makeArcadePill(274, 88, '🎬 SECOUER', 0x7b2cbf, 0x3c096c, () => this.triggerShakeBooster());
     makeArcadePill(274, 125, '🎬 ÉPINGLE', 0xff3b5c, 0xa4133c, () => this.triggerPinBooster());
   }
 
