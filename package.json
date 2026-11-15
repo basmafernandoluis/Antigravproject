@@ -2,7 +2,7 @@
   "name": "juicy-drop",
   "version": "1.0.0",
   "description": "Hyper-casual physics merge game built with Phaser 3, Matter.js, and Capacitor",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -17,12 +17,12 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/basmafernandoluis/Antigravproject/issues"
   },
   "homepage": "https://github.com/basmafernandoluis/Antigravproject#readme",
   "dependencies": {
+    "@capacitor-community/admob": "^8.3.0",
     "@capacitor/core": "^8.6.2",
     "phaser": "^4.2.1"
   },

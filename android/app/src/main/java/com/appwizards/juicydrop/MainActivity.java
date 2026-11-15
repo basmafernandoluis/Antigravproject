@@ -1,4 +1,4 @@
-package com.antigrav.juicydrop;
+package com.appwizards.juicydrop;
 
 import com.getcapacitor.BridgeActivity;
 
