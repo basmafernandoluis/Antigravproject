@@ -54,6 +54,28 @@ export default class GameScene extends Phaser.Scene {
     // Pick initial current & next fruit
     this.nextTier = Phaser.Math.Between(0, MAX_SPAWN_TIER);
     this.prepareNextDrop();
+
+    // First-time micro-tutorial
+    if (storageManager.getGamesPlayed() === 0) {
+      this.tutorialHint = this.add
+        .text(GAME_WIDTH / 2, JAR_TOP + 120, '👆 GLISSE POUR VISER\nRELÂCHE POUR LÂCHER !', {
+          fontSize: '16px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          align: 'center',
+          backgroundColor: '#1b1e3fcc',
+          padding: { x: 16, y: 10 },
+        })
+        .setOrigin(0.5)
+        .setDepth(14);
+      this.tweens.add({
+        targets: this.tutorialHint,
+        alpha: 0.65,
+        duration: 700,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
   }
 
   drawBackground() {
@@ -408,6 +430,17 @@ export default class GameScene extends Phaser.Scene {
     this.canDrop = false;
     this.dropperFruit.setVisible(false);
     this.aimLine.clear();
+
+    if (this.tutorialHint) {
+      const hint = this.tutorialHint;
+      this.tutorialHint = null;
+      this.tweens.add({
+        targets: hint,
+        alpha: 0,
+        duration: 200,
+        onComplete: () => hint.destroy(),
+      });
+    }
 
     soundFX.playDrop();
     this.spawnPhysicsFruit(this.aimX, DROP_Y, this.currentTier, false);
@@ -1062,6 +1095,37 @@ export default class GameScene extends Phaser.Scene {
       alpha: 1,
       duration: 200,
       ease: 'Back.easeOut',
+    });
+  }
+
+  showToast(message) {
+    const toast = this.add
+      .text(GAME_WIDTH / 2, JAR_BOTTOM - 40, message, {
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        backgroundColor: '#1b1e3f',
+        padding: { x: 14, y: 8 },
+      })
+      .setOrigin(0.5)
+      .setDepth(40)
+      .setAlpha(0);
+
+    this.tweens.add({
+      targets: toast,
+      alpha: 1,
+      y: toast.y - 10,
+      duration: 180,
+      onComplete: () => {
+        this.time.delayedCall(1500, () => {
+          this.tweens.add({
+            targets: toast,
+            alpha: 0,
+            duration: 250,
+            onComplete: () => toast.destroy(),
+          });
+        });
+      },
     });
   }
 }
