@@ -1,0 +1,8 @@
+{
+	"appId": "com.antigrav.juicydrop",
+	"appName": "Juicy Drop",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	}
+}
