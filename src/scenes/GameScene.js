@@ -187,99 +187,105 @@ export default class GameScene extends Phaser.Scene {
   createUI() {
     // Top Header Bar
     this.add
-      .text(28, 26, 'JUICY DROP!', {
-        fontSize: '24px',
+      .text(24, 22, 'JUICY DROP!', {
+        fontSize: '28px',
         fontStyle: '900',
         color: '#ffffff',
         stroke: '#ff3b5c',
-        strokeThickness: 4,
+        strokeThickness: 5,
       })
       .setOrigin(0, 0);
 
-    // Score Card
-    const scoreBg = this.add.graphics();
-    scoreBg.fillStyle(0xffffff, 0.08);
-    scoreBg.fillRoundedRect(26, 62, 160, 56, 14);
-    scoreBg.lineStyle(1.5, 0xffffff, 0.15);
-    scoreBg.strokeRoundedRect(26, 62, 160, 56, 14);
+    // Glass Icon Buttons (Settings & Sound)
+    const makeIconBtn = (x, y, iconText, onClick) => {
+      const container = this.add.container(x, y).setDepth(12);
+      const bg = this.add.graphics();
+      bg.fillStyle(0xffffff, 0.1);
+      bg.fillRoundedRect(-21, -21, 42, 42, 12);
+      bg.lineStyle(1.5, 0x8ecae6, 0.45);
+      bg.strokeRoundedRect(-21, -21, 42, 42, 12);
 
-    this.add.text(40, 70, 'SCORE', {
-      fontSize: '11px',
-      fontStyle: 'bold',
-      color: '#a5b4fc',
-    });
+      const txt = this.add.text(0, 0, iconText, { fontSize: '20px' }).setOrigin(0.5);
+      const zone = this.add.zone(0, 0, 42, 42).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', (pointer) => {
+        pointer.event?.stopPropagation?.();
+        soundFX.playClick();
+        this.tweens.add({ targets: container, scale: 0.88, duration: 60, yoyo: true });
+        onClick(txt);
+      });
+      container.add([bg, txt, zone]);
+      return { container, txt };
+    };
 
-    this.scoreText = this.add.text(40, 86, '0', {
-      fontSize: '24px',
-      fontStyle: '900',
-      color: '#ffffff',
-    });
-
-    this.bestText = this.add
-      .text(176, 70, `MAX ${this.bestScore}`, {
-        fontSize: '11px',
-        fontStyle: 'bold',
-        color: '#ffd166',
-      })
-      .setOrigin(1, 0);
-
-    // Next Fruit Card
-    const nextBg = this.add.graphics();
-    nextBg.fillStyle(0xffffff, 0.08);
-    nextBg.fillRoundedRect(GAME_WIDTH - 134, 48, 108, 72, 14);
-    nextBg.lineStyle(1.5, 0xffffff, 0.15);
-    nextBg.strokeRoundedRect(GAME_WIDTH - 134, 48, 108, 72, 14);
-
-    this.add
-      .text(GAME_WIDTH - 80, 56, 'SUIVANT', {
-        fontSize: '11px',
-        fontStyle: 'bold',
-        color: '#a5b4fc',
-      })
-      .setOrigin(0.5, 0);
-
-    this.nextPreviewSprite = this.add.image(GAME_WIDTH - 80, 92, 'fruit_0').setScale(0.75);
-
-    // Sound Mute Button
-    this.muteBtn = this.add
-      .text(GAME_WIDTH - 156, 26, soundFX.muted ? '🔇' : '🔊', {
-        fontSize: '22px',
-      })
-      .setOrigin(0.5, 0)
-      .setInteractive({ useHandCursor: true });
-
-    this.muteBtn.on('pointerdown', (pointer) => {
-      pointer.event?.stopPropagation?.();
+    const muteObj = makeIconBtn(GAME_WIDTH - 92, 40, soundFX.muted ? '🔇' : '🔊', (txt) => {
       const muted = soundFX.toggleMute();
-      this.muteBtn.setText(muted ? '🔇' : '🔊');
+      txt.setText(muted ? '🔇' : '🔊');
     });
+    this.muteBtn = muteObj.txt;
 
-    // Settings Button
-    this.settingsBtn = this.add
-      .text(GAME_WIDTH - 190, 26, '⚙️', {
-        fontSize: '21px',
-      })
-      .setOrigin(0.5, 0)
-      .setInteractive({ useHandCursor: true });
-
-    this.settingsBtn.on('pointerdown', (pointer) => {
-      pointer.event?.stopPropagation?.();
+    makeIconBtn(GAME_WIDTH - 42, 40, '⚙️', () => {
       if (!this.isGameOver) {
         this.openSettingsModal();
       }
     });
 
-    // Rewarded Booster Pills (Secouer & Épingle)
+    // Score Card (Glossy Glass)
+    const scoreBg = this.add.graphics();
+    scoreBg.fillStyle(0x1e224d, 0.85);
+    scoreBg.fillRoundedRect(24, 74, 166, 68, 16);
+    scoreBg.lineStyle(2, 0x8ecae6, 0.45);
+    scoreBg.strokeRoundedRect(24, 74, 166, 68, 16);
+
+    this.add.text(36, 82, 'SCORE', {
+      fontSize: '13px',
+      fontStyle: '900',
+      color: '#a5b4fc',
+    });
+
+    this.scoreText = this.add.text(36, 100, '0', {
+      fontSize: '30px',
+      fontStyle: '900',
+      color: '#ffffff',
+      stroke: '#0d0e22',
+      strokeThickness: 3,
+    });
+
+    this.bestText = this.add
+      .text(178, 82, `TOP ${this.bestScore}`, {
+        fontSize: '13px',
+        fontStyle: '900',
+        color: '#ffd166',
+      })
+      .setOrigin(1, 0);
+
+    // Next Fruit Card (Glossy Glass)
+    const nextBg = this.add.graphics();
+    nextBg.fillStyle(0x1e224d, 0.85);
+    nextBg.fillRoundedRect(GAME_WIDTH - 122, 74, 98, 68, 16);
+    nextBg.lineStyle(2, 0x8ecae6, 0.45);
+    nextBg.strokeRoundedRect(GAME_WIDTH - 122, 74, 98, 68, 16);
+
+    this.add
+      .text(GAME_WIDTH - 73, 81, 'SUIVANT', {
+        fontSize: '12px',
+        fontStyle: '900',
+        color: '#a5b4fc',
+      })
+      .setOrigin(0.5, 0);
+
+    this.nextPreviewSprite = this.add.image(GAME_WIDTH - 73, 117, 'fruit_0').setScale(0.75);
+
+    // Rewarded Booster Pills (aligned neatly between Score & Next)
     this.createBoosterButtons();
 
     // Pin Mode Hint Banner
     this.pinBanner = this.add
       .text(GAME_WIDTH / 2, DROP_Y - 26, '📌 TOUCHEZ UN FRUIT À DÉTRUIRE', {
-        fontSize: '13px',
-        fontStyle: 'bold',
+        fontSize: '15px',
+        fontStyle: '900',
         color: '#ffd166',
         backgroundColor: '#1b1e3f',
-        padding: { x: 10, y: 5 },
+        padding: { x: 14, y: 7 },
       })
       .setOrigin(0.5)
       .setDepth(15)
@@ -294,25 +300,39 @@ export default class GameScene extends Phaser.Scene {
   }
 
   createBoosterButtons() {
-    const makePill = (x, y, label, bgColor, onClick) => {
+    const makeArcadePill = (x, y, label, fillColor, lipColor, onClick) => {
       const container = this.add.container(x, y).setDepth(12);
+      const w = 148;
+      const h = 30;
       const bg = this.add.graphics();
-      bg.fillStyle(bgColor, 0.92);
-      bg.fillRoundedRect(-62, -16, 124, 32, 16);
-      bg.lineStyle(1.5, 0xffffff, 0.28);
-      bg.strokeRoundedRect(-62, -16, 124, 32, 16);
+      // 3D bottom lip
+      bg.fillStyle(lipColor, 1);
+      bg.fillRoundedRect(-w / 2, -h / 2 + 3, w, h, 15);
+      // Main pill body
+      bg.fillStyle(fillColor, 1);
+      bg.fillRoundedRect(-w / 2, -h / 2, w, h, 15);
+      // Top glossy highlight
+      bg.fillStyle(0xffffff, 0.22);
+      bg.fillRoundedRect(-w / 2 + 6, -h / 2 + 2, w - 12, 8, 4);
+      // Crisp border
+      bg.lineStyle(1.5, 0xffffff, 0.35);
+      bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 15);
 
       const txt = this.add
-        .text(0, 0, label, {
-          fontSize: '12px',
-          fontStyle: 'bold',
+        .text(0, -1, label, {
+          fontSize: '13px',
+          fontStyle: '900',
           color: '#ffffff',
+          stroke: '#0d0e22',
+          strokeThickness: 2,
         })
         .setOrigin(0.5);
 
-      const zone = this.add.zone(0, 0, 124, 32).setInteractive({ useHandCursor: true });
+      const zone = this.add.zone(0, 0, w, h + 4).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', (pointer) => {
         pointer.event?.stopPropagation?.();
+        soundFX.playClick();
+        this.tweens.add({ targets: container, scale: 0.92, duration: 65, yoyo: true });
         onClick();
       });
 
@@ -320,8 +340,8 @@ export default class GameScene extends Phaser.Scene {
       return container;
     };
 
-    makePill(262, 66, '🎬 SECOUER', 0x5a189a, () => this.triggerShakeBooster());
-    makePill(262, 104, '🎬 ÉPINGLE', 0xc9184a, () => this.triggerPinBooster());
+    makeArcadePill(274, 89, '🎬 SECOUER', 0x7b2cbf, 0x3c096c, () => this.triggerShakeBooster());
+    makeArcadePill(274, 125, '🎬 ÉPINGLE', 0xff3b5c, 0xa4133c, () => this.triggerPinBooster());
   }
 
   createEvolutionBar() {
@@ -485,12 +505,36 @@ export default class GameScene extends Phaser.Scene {
   }
 
   setupCollisions() {
+    this.lastImpactTime = 0;
+
     this.matter.world.on('collisionstart', (event) => {
       if (this.isGameOver) return;
 
       for (const pair of event.pairs) {
         const objA = pair.bodyA.gameObject;
         const objB = pair.bodyB.gameObject;
+
+        // Impact feedback when a fruit lands hard
+        const now = this.time.now;
+        if (now - this.lastImpactTime > 90) {
+          const vA = pair.bodyA.velocity ? Math.hypot(pair.bodyA.velocity.x, pair.bodyA.velocity.y) : 0;
+          const vB = pair.bodyB.velocity ? Math.hypot(pair.bodyB.velocity.x, pair.bodyB.velocity.y) : 0;
+          const speed = Math.max(vA, vB);
+          if (speed > 4.2) {
+            this.lastImpactTime = now;
+            soundFX.playImpact(speed);
+            const targetObj = (objA && objA.active && objA.getData('tier') !== undefined) ? objA : objB;
+            if (targetObj && targetObj.active && targetObj.getData('tier') !== undefined) {
+              this.tweens.add({
+                targets: targetObj,
+                scaleX: 1.12,
+                scaleY: 0.88,
+                duration: 65,
+                yoyo: true,
+              });
+            }
+          }
+        }
 
         if (!objA || !objB || !objA.active || !objB.active) continue;
         if (objA.getData('merging') || objB.getData('merging')) continue;
@@ -534,14 +578,14 @@ export default class GameScene extends Phaser.Scene {
     // Pop score text
     this.tweens.add({
       targets: this.scoreText,
-      scale: 1.18,
-      duration: 90,
+      scale: 1.24,
+      duration: 95,
       yoyo: true,
     });
 
     if (storageManager.updateBestScore(this.score)) {
       this.bestScore = this.score;
-      this.bestText.setText(`MAX ${this.bestScore}`);
+      this.bestText.setText(`TOP ${this.bestScore}`);
     }
     if (storageManager.updateMaxTier(nextTier)) {
       const unlockedIcon = this.evolutionIcons?.[nextTier];
@@ -561,67 +605,99 @@ export default class GameScene extends Phaser.Scene {
     // Spawn upgraded fruit
     this.spawnPhysicsFruit(midX, midY, nextTier, true);
 
-    // --- GAME FEEL: Audio, Screen Shake, Shockwave, Particles, Confetti ---
+    // --- GAME FEEL: Audio, Haptics, Flash, Screen Shake, Shockwaves, Particles, Confetti ---
     soundFX.playMerge(nextTier, this.comboCount);
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(nextTier >= 4 ? [18, 25, 22] : 16);
+    }
 
     // 1. Screen Shake scaled by tier & combo
-    const shakeIntensity = Math.min(0.022, 0.004 + nextTier * 0.0018 + (this.comboCount - 1) * 0.002);
-    const shakeDuration = Math.min(260, 90 + nextTier * 15);
+    const shakeIntensity = Math.min(0.026, 0.005 + nextTier * 0.002 + (this.comboCount - 1) * 0.0025);
+    const shakeDuration = Math.min(280, 100 + nextTier * 16);
     this.cameras.main.shake(shakeDuration, shakeIntensity);
 
-    // 2. Expanding Shockwave Ring
+    if (nextTier >= 5 || this.comboCount >= 3) {
+      this.cameras.main.flash(140, 255, 240, 200, false);
+    }
+
+    // 2. Additive Merge Flash Glow
+    const glow = this.add.circle(midX, midY, FRUITS[nextTier].radius * 0.9, 0xffffff, 0.85).setDepth(6);
+    this.tweens.add({
+      targets: glow,
+      scale: 1.6,
+      alpha: 0,
+      duration: 180,
+      ease: 'Cubic.easeOut',
+      onComplete: () => glow.destroy(),
+    });
+
+    // 3. Expanding Double Shockwave Ring
     const ring = this.add.circle(midX, midY, FRUITS[tier].radius, FRUITS[nextTier].color, 0);
-    ring.setStrokeStyle(4, 0xffffff, 0.9);
+    ring.setStrokeStyle(5, 0xffffff, 0.95);
     ring.setDepth(6);
     this.tweens.add({
       targets: ring,
-      scale: 2.2,
+      scale: 2.35,
       alpha: 0,
-      duration: 280,
+      duration: 300,
       ease: 'Cubic.easeOut',
       onComplete: () => ring.destroy(),
     });
 
-    // 3. Juicy Fruit Particles
-    const burstCount = 12 + nextTier * 3;
+    // 4. Juicy Fruit Particles + Star Sparks
+    const burstCount = 16 + nextTier * 3;
     const emitter = this.add.particles(midX, midY, 'particle_dot', {
-      speed: { min: 70, max: 220 + nextTier * 18 },
+      speed: { min: 90, max: 250 + nextTier * 20 },
       angle: { min: 0, max: 360 },
-      scale: { start: 0.75, end: 0 },
+      scale: { start: 0.85, end: 0 },
       alpha: { start: 1, end: 0 },
-      lifespan: { min: 260, max: 520 },
+      lifespan: { min: 280, max: 560 },
       tint: [FRUITS[nextTier].color, FRUITS[nextTier].highlight, 0xffffff],
-      gravityY: 240,
+      gravityY: 260,
       emitting: false,
     });
     emitter.setDepth(7);
     emitter.explode(burstCount);
-    this.time.delayedCall(600, () => emitter.destroy());
+    this.time.delayedCall(620, () => emitter.destroy());
 
-    // 4. Confetti Explosion on big merges (tier >= 4) or combos (>= x2)
-    if (nextTier >= 4 || this.comboCount >= 2) {
-      this.spawnConfetti(midX, midY, 18 + nextTier * 4);
+    const sparks = this.add.particles(midX, midY, 'spark_star', {
+      speed: { min: 110, max: 280 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.9, end: 0 },
+      rotate: { min: 0, max: 180 },
+      alpha: { start: 1, end: 0 },
+      lifespan: { min: 220, max: 420 },
+      tint: [0xffffff, 0xffd166, FRUITS[nextTier].highlight],
+      emitting: false,
+    });
+    sparks.setDepth(8);
+    sparks.explode(8 + nextTier);
+    this.time.delayedCall(480, () => sparks.destroy());
+
+    // 5. Confetti Explosion on big merges (tier >= 3) or combos (>= x2)
+    if (nextTier >= 3 || this.comboCount >= 2) {
+      this.spawnConfetti(midX, midY, 20 + nextTier * 4);
     }
 
-    // 5. Floating Score / Combo Text
-    const label = this.comboCount > 1 ? `+${gained}  COMBO x${this.comboCount}!` : `+${gained}`;
+    // 6. Floating Score / Combo Text (bigger & punchier for S22)
+    const label = this.comboCount > 1 ? `+${gained}  🔥x${this.comboCount}!` : `+${gained}`;
     const floatTxt = this.add
-      .text(midX, midY - 10, label, {
-        fontSize: this.comboCount > 1 ? '20px' : '16px',
+      .text(midX, midY - 12, label, {
+        fontSize: this.comboCount > 1 ? '24px' : '19px',
         fontStyle: '900',
         color: this.comboCount > 1 ? '#ffd166' : '#ffffff',
-        stroke: '#13152e',
-        strokeThickness: 4,
+        stroke: '#0d0e22',
+        strokeThickness: 5,
       })
       .setOrigin(0.5)
       .setDepth(10);
 
     this.tweens.add({
       targets: floatTxt,
-      y: midY - 58,
+      y: midY - 64,
       alpha: 0,
-      scale: this.comboCount > 1 ? 1.25 : 1.05,
-      duration: 750,
+      scale: this.comboCount > 1 ? 1.3 : 1.1,
+      duration: 800,
       ease: 'Cubic.easeOut',
       onComplete: () => floatTxt.destroy(),
     });
@@ -953,22 +1029,36 @@ export default class GameScene extends Phaser.Scene {
 
   makeModalButton(x, y, label, bgColor, textColor, onClick) {
     const container = this.add.container(x, y);
+    const w = 264;
+    const h = 50;
     const bg = this.add.graphics();
+    // Subtle dark 3D bottom lip
+    bg.fillStyle(0x000000, 0.35);
+    bg.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 25);
+    // Main button fill
     bg.fillStyle(bgColor, 1);
-    bg.fillRoundedRect(-125, -24, 250, 48, 24);
-    bg.lineStyle(2, 0xffffff, 0.35);
-    bg.strokeRoundedRect(-125, -24, 250, 48, 24);
+    bg.fillRoundedRect(-w / 2, -h / 2, w, h, 25);
+    // Top glossy highlight
+    bg.fillStyle(0xffffff, 0.2);
+    bg.fillRoundedRect(-w / 2 + 10, -h / 2 + 3, w - 20, 12, 6);
+    // Border
+    bg.lineStyle(2, 0xffffff, 0.38);
+    bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 25);
 
     const txt = this.add
-      .text(0, 0, label, {
-        fontSize: '17px',
+      .text(0, -1, label, {
+        fontSize: '18px',
         fontStyle: '900',
         color: textColor,
       })
       .setOrigin(0.5);
 
-    const zone = this.add.zone(0, 0, 250, 48).setInteractive({ useHandCursor: true });
-    zone.on('pointerdown', onClick);
+    const zone = this.add.zone(0, 0, w, h + 4).setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', () => {
+      soundFX.playClick();
+      this.tweens.add({ targets: container, scale: 0.93, duration: 65, yoyo: true });
+      onClick();
+    });
 
     container.add([bg, txt, zone]);
     return container;
