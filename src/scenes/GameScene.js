@@ -293,6 +293,9 @@ export default class GameScene extends Phaser.Scene {
     bg.fillStyle(0xffffff, 0.06);
     bg.fillRoundedRect(24, barY - 22, GAME_WIDTH - 48, 44, 14);
 
+    const maxTier = storageManager.getMaxTierReached();
+    this.evolutionIcons = [];
+
     const startX = 46;
     const stepX = (GAME_WIDTH - 92) / (FRUITS.length - 1);
     FRUITS.forEach((f, idx) => {
@@ -300,6 +303,8 @@ export default class GameScene extends Phaser.Scene {
       const icon = this.add.image(x, barY, `fruit_${f.tier}`);
       const targetSize = 22 + idx * 0.8;
       icon.setDisplaySize(targetSize, targetSize);
+      icon.setAlpha(idx <= maxTier ? 1 : 0.28);
+      this.evolutionIcons.push(icon);
     });
   }
 
@@ -490,7 +495,20 @@ export default class GameScene extends Phaser.Scene {
       this.bestScore = this.score;
       this.bestText.setText(`MAX ${this.bestScore}`);
     }
-    storageManager.updateMaxTier(nextTier);
+    if (storageManager.updateMaxTier(nextTier)) {
+      const unlockedIcon = this.evolutionIcons?.[nextTier];
+      if (unlockedIcon) {
+        unlockedIcon.setAlpha(1);
+        this.tweens.add({
+          targets: unlockedIcon,
+          scale: unlockedIcon.scale * 1.45,
+          duration: 220,
+          yoyo: true,
+          ease: 'Back.easeOut',
+        });
+      }
+      this.showNewFruitBanner(FRUITS[nextTier]);
+    }
 
     // Spawn upgraded fruit
     this.spawnPhysicsFruit(midX, midY, nextTier, true);
@@ -558,6 +576,42 @@ export default class GameScene extends Phaser.Scene {
       duration: 750,
       ease: 'Cubic.easeOut',
       onComplete: () => floatTxt.destroy(),
+    });
+  }
+
+  showNewFruitBanner(fruit) {
+    const banner = this.add
+      .text(GAME_WIDTH / 2, JAR_TOP + 45, `🌟 NOUVEAU FRUIT : ${fruit.name.toUpperCase()} !`, {
+        fontSize: '15px',
+        fontStyle: '900',
+        color: '#ffd166',
+        backgroundColor: '#1b1e3f',
+        padding: { x: 14, y: 7 },
+        stroke: '#13152e',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(16)
+      .setScale(0.5)
+      .setAlpha(0);
+
+    this.tweens.add({
+      targets: banner,
+      scale: 1,
+      alpha: 1,
+      duration: 220,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.time.delayedCall(1200, () => {
+          this.tweens.add({
+            targets: banner,
+            y: banner.y - 24,
+            alpha: 0,
+            duration: 300,
+            onComplete: () => banner.destroy(),
+          });
+        });
+      },
     });
   }
 
