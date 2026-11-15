@@ -1166,10 +1166,14 @@ export default class GameScene extends Phaser.Scene {
     const privacyBtn = this.makeModalButton(
       0,
       84,
-      '🔒  CONFIDENTIALITÉ (RGPD)',
+      '🔒  VIE PRIVÉE (RGPD)',
       0x2b2d42,
       '#ffffff',
       () => {
+        if (!adManager.isNative()) {
+          this.showToast('🔒 Disponible sur Android');
+          return;
+        }
         adManager.showPrivacyOptions();
       }
     );
