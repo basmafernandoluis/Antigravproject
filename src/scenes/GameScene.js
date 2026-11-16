@@ -11,16 +11,28 @@ const GAME_WIDTH = 480;
 const GAME_HEIGHT = 854;
 const FONT_FAMILY = 'Fredoka, "Arial Rounded MT Bold", "Trebuchet MS", sans-serif';
 
-// Container / Jar geometry
-const JAR_LEFT = 36;
-const JAR_RIGHT = 444;
-const JAR_TOP = 246;
-const JAR_BOTTOM = 776;
+// Container / Jar geometry (calibrated for 2-4 min Sweet Spot)
+const JAR_LEFT = 62;
+const JAR_RIGHT = 418;
+const JAR_TOP = 262;
+const JAR_BOTTOM = 758;
 const WALL_THICKNESS = 24;
-const DANGER_Y = 276;
-const DROP_Y = 196;
+const DANGER_Y = 290;
+const DROP_Y = 212;
 
 const CONFETTI_COLORS = [0xff3b5c, 0xffd166, 0x06d6a0, 0x118ab2, 0x9b5de5, 0xff7b00];
+
+const RUN_MISSIONS = [
+  { type: 'tier', target: 4, label: 'Crée 1 Orange', reward: 150 },
+  { type: 'combo', target: 2, label: 'Fais un Combo ×2', reward: 200 },
+  { type: 'tier', target: 5, label: 'Crée 1 Pomme', reward: 250 },
+  { type: 'score', target: 1500, label: 'Atteins 1 500 pts', reward: 300 },
+  { type: 'tier', target: 7, label: 'Crée 1 Pêche', reward: 400 },
+  { type: 'combo', target: 3, label: 'Fais un Combo ×3', reward: 450 },
+  { type: 'score', target: 4000, label: 'Atteins 4 000 pts', reward: 600 },
+  { type: 'tier', target: 9, label: 'Crée 1 Melon', reward: 800 },
+  { type: 'tier', target: 10, label: 'Crée la Pastèque !', reward: 1500 },
+];
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -41,6 +53,7 @@ export default class GameScene extends Phaser.Scene {
     this.comboCount = 0;
     this.lastMergeTime = 0;
     this.dangerTimer = 0;
+    this.missionIndex = 0;
     this.fruits = [];
     this.gameOverObjects = [];
 
@@ -369,6 +382,22 @@ export default class GameScene extends Phaser.Scene {
     // Rewarded Booster Pills (aligned neatly between Score & Next)
     this.createBoosterButtons();
 
+    // Live Quick Mission Pill (right below HUD, safely above DROP_Y)
+    const mBg = this.add.graphics();
+    mBg.fillStyle(0x1e224d, 0.9);
+    mBg.fillRoundedRect(24, 146, GAME_WIDTH - 48, 24, 12);
+    mBg.lineStyle(1.5, 0xffd166, 0.55);
+    mBg.strokeRoundedRect(24, 146, GAME_WIDTH - 48, 24, 12);
+    this.missionText = this.add
+      .text(GAME_WIDTH / 2, 158, '', {
+        fontFamily: FONT_FAMILY,
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#ffd166',
+      })
+      .setOrigin(0.5);
+    this.updateMissionPill();
+
     // Pin Mode Hint Banner
     this.pinBanner = this.add
       .text(GAME_WIDTH / 2, DROP_Y - 26, '📌 TOUCHEZ UN FRUIT À DÉTRUIRE', {
@@ -388,6 +417,16 @@ export default class GameScene extends Phaser.Scene {
 
     // Bottom Evolution Legend (11 fruits mini-bar)
     this.createEvolutionBar();
+  }
+
+  updateMissionPill() {
+    if (!this.missionText) return;
+    const m = RUN_MISSIONS[this.missionIndex];
+    if (!m) {
+      this.missionText.setText('🌟 TOUTES LES MISSIONS VALIDÉES !');
+      return;
+    }
+    this.missionText.setText(`🎯 Mission : ${m.label}  (+${m.reward} pts)`);
   }
 
   createBoosterButtons() {
@@ -411,8 +450,9 @@ export default class GameScene extends Phaser.Scene {
 
       const txt = this.add
         .text(0, 0, label, {
-          fontSize: '14px',
-          fontStyle: '900',
+          fontFamily: FONT_FAMILY,
+          fontSize: '13px',
+          fontStyle: 'bold',
           color: '#ffffff',
         })
         .setOrigin(0.5);
@@ -426,11 +466,24 @@ export default class GameScene extends Phaser.Scene {
       });
 
       container.add([bg, txt, zone]);
-      return container;
+      return { container, txt };
     };
 
-    makeArcadePill(274, 88, '🎬 SECOUER', 0x7b2cbf, 0x3c096c, () => this.triggerShakeBooster());
-    makeArcadePill(274, 125, '🎬 ÉPINGLE', 0xff3b5c, 0xa4133c, () => this.triggerPinBooster());
+    const shakeObj = makeArcadePill(274, 88, '🎬 SECOUER', 0x7b2cbf, 0x3c096c, () => this.triggerShakeBooster());
+    const pinObj = makeArcadePill(274, 125, '🎬 ÉPINGLE', 0xff3b5c, 0xa4133c, () => this.triggerPinBooster());
+    this.shakeBtnTxt = shakeObj.txt;
+    this.pinBtnTxt = pinObj.txt;
+    this.refreshBoosterLabels();
+  }
+
+  refreshBoosterLabels() {
+    const tokens = storageManager.getFreeTokens();
+    if (this.shakeBtnTxt) {
+      this.shakeBtnTxt.setText(tokens > 0 ? `🎁 SECOUER (${tokens})` : '🎬 SECOUER');
+    }
+    if (this.pinBtnTxt) {
+      this.pinBtnTxt.setText(tokens > 0 ? `🎁 ÉPINGLE (${tokens})` : '🎬 ÉPINGLE');
+    }
   }
 
   createEvolutionBar() {
@@ -631,7 +684,7 @@ export default class GameScene extends Phaser.Scene {
         const tierA = objA.getData('tier');
         const tierB = objB.getData('tier');
 
-        if (tierA !== undefined && tierA === tierB && tierA < FRUITS.length - 1) {
+        if (tierA !== undefined && tierA === tierB) {
           objA.setData('merging', true);
           objB.setData('merging', true);
           this.handleMerge(objA, objB, tierA);
@@ -643,7 +696,6 @@ export default class GameScene extends Phaser.Scene {
   handleMerge(objA, objB, tier) {
     const midX = (objA.x + objB.x) / 2;
     const midY = (objA.y + objB.y) / 2;
-    const nextTier = tier + 1;
 
     // Remove old fruits
     this.fruits = this.fruits.filter((f) => f !== objA && f !== objB);
@@ -658,6 +710,25 @@ export default class GameScene extends Phaser.Scene {
       this.comboCount = 1;
     }
     this.lastMergeTime = now;
+
+    // Mythic Watermelon Explosion (2 Pastèques -> +5000 pts & clear space!)
+    if (tier >= FRUITS.length - 1) {
+      const bonus = 5000 * this.comboCount;
+      this.score += bonus;
+      this.scoreText.setText(String(this.score));
+      if (storageManager.updateBestScore(this.score)) {
+        this.bestScore = this.score;
+        this.bestText.setText(`👑 ${this.bestScore}`);
+      }
+      soundFX.playMerge(tier, this.comboCount + 1);
+      this.cameras.main.shake(360, 0.024);
+      this.spawnConfetti(midX, midY, 55);
+      this.showToast(`🍉 EXPLOSION MYTHIQUE ! +${bonus}`);
+      this.checkRunMission({ tier, combo: this.comboCount, score: this.score });
+      return;
+    }
+
+    const nextTier = tier + 1;
 
     // Score update
     const gained = FRUITS[nextTier].score * this.comboCount;
@@ -674,8 +745,9 @@ export default class GameScene extends Phaser.Scene {
 
     if (storageManager.updateBestScore(this.score)) {
       this.bestScore = this.score;
-      this.bestText.setText(`TOP ${this.bestScore}`);
+      this.bestText.setText(`👑 ${this.bestScore}`);
     }
+    this.checkRunMission({ tier: nextTier, combo: this.comboCount, score: this.score });
     if (storageManager.updateMaxTier(nextTier)) {
       const unlockedIcon = this.evolutionIcons?.[nextTier];
       if (unlockedIcon) {
@@ -864,7 +936,7 @@ export default class GameScene extends Phaser.Scene {
 
     if (overflowing) {
       this.dangerTimer += delta;
-      const ratio = Phaser.Math.Clamp(this.dangerTimer / 1500, 0, 1);
+      const ratio = Phaser.Math.Clamp(this.dangerTimer / 1200, 0, 1);
 
       this.drawDangerLine(0.5 + 0.5 * Math.sin(now * 0.02));
       this.dangerBadge.setAlpha(1);
@@ -872,7 +944,7 @@ export default class GameScene extends Phaser.Scene {
       this.dangerBarFill.setVisible(true);
       this.dangerBarFill.width = 180 * ratio;
 
-      if (this.dangerTimer >= 1500) {
+      if (this.dangerTimer >= 1200) {
         this.triggerGameOver();
       }
     } else {
@@ -885,6 +957,29 @@ export default class GameScene extends Phaser.Scene {
         this.dangerBarBg.setVisible(false);
         this.dangerBarFill.setVisible(false);
       }
+    }
+  }
+
+  checkRunMission({ tier = 0, combo = 0, score = 0 }) {
+    const m = RUN_MISSIONS[this.missionIndex];
+    if (!m) return;
+
+    let done = false;
+    if (m.type === 'tier' && tier >= m.target) done = true;
+    if (m.type === 'combo' && combo >= m.target) done = true;
+    if (m.type === 'score' && score >= m.target) done = true;
+
+    if (done) {
+      this.score += m.reward;
+      this.scoreText.setText(String(this.score));
+      if (storageManager.updateBestScore(this.score)) {
+        this.bestScore = this.score;
+        this.bestText.setText(`👑 ${this.bestScore}`);
+      }
+      this.showToast(`🎯 MISSION VALIDÉE ! +${m.reward} pts`);
+      this.spawnConfetti(GAME_WIDTH / 2, JAR_TOP + 30, 22);
+      this.missionIndex += 1;
+      this.updateMissionPill();
     }
   }
 
@@ -904,38 +999,54 @@ export default class GameScene extends Phaser.Scene {
     soundFX.muted = this.wasMutedBeforeAd ?? false;
   }
 
+  _executeShake() {
+    this.cameras.main.shake(280, 0.016);
+    for (const fruit of this.fruits) {
+      if (!fruit.active) continue;
+      fruit.setVelocity(
+        Phaser.Math.FloatBetween(-6, 6),
+        Phaser.Math.FloatBetween(-9, -4)
+      );
+    }
+    this.spawnConfetti(GAME_WIDTH / 2, JAR_TOP + 60, 20);
+  }
+
   triggerShakeBooster() {
     if (this.isGameOver || this.fruits.length === 0 || adManager.isShowingAd) return;
 
+    if (storageManager.consumeFreeToken()) {
+      this.refreshBoosterLabels();
+      this._executeShake();
+      return;
+    }
+
     adManager.showRewarded({
       onStart: () => this.pauseForAd(),
-      onReward: () => {
-        this.cameras.main.shake(280, 0.016);
-        for (const fruit of this.fruits) {
-          if (!fruit.active) continue;
-          fruit.setVelocity(
-            Phaser.Math.FloatBetween(-6, 6),
-            Phaser.Math.FloatBetween(-9, -4)
-          );
-        }
-        this.spawnConfetti(GAME_WIDTH / 2, JAR_TOP + 60, 20);
-      },
+      onReward: () => this._executeShake(),
       onDismiss: () => this.resumeFromAd(),
     });
+  }
+
+  _executePin() {
+    this.pinMode = true;
+    this.canDrop = false;
+    this.aimLine.clear();
+    this.dropperFruit.setVisible(false);
+    this.pinBanner.setVisible(true);
   }
 
   triggerPinBooster() {
     if (this.isGameOver || this.fruits.length === 0 || this.pinMode || adManager.isShowingAd) return;
 
+    if (storageManager.consumeFreeToken()) {
+      this.refreshBoosterLabels();
+      this._executePin();
+      return;
+    }
+
     adManager.showRewarded({
       onStart: () => this.pauseForAd(),
-      onReward: () => {
-        this.pinMode = true;
-        this.canDrop = false;
-        this.aimLine.clear();
-        this.dropperFruit.setVisible(false);
-        this.pinBanner.setVisible(true);
-      },
+      onReward: () => this._executePin(),
       onDismiss: () => this.resumeFromAd(),
     });
   }
@@ -987,6 +1098,11 @@ export default class GameScene extends Phaser.Scene {
 
     storageManager.incrementGamesPlayed();
     storageManager.recordDailyProgress({ score: this.score, gameEnded: true });
+    const xpEarned = Math.max(25, Math.round(this.score / 12));
+    const rankRes = storageManager.addXp(xpEarned);
+    if (rankRes.leveledUp) {
+      this.refreshBoosterLabels();
+    }
     soundFX.playGameOver();
     this.cameras.main.shake(300, 0.015);
 
@@ -1011,7 +1127,7 @@ export default class GameScene extends Phaser.Scene {
       .setScale(0.6)
       .setAlpha(0);
 
-    const cardH = canContinue ? 385 : 330;
+    const cardH = (canContinue ? 435 : 380) + (canDoubleScore ? 0 : -50);
     const cardTop = -cardH / 2;
 
     const cardBg = this.add.graphics();
@@ -1021,15 +1137,17 @@ export default class GameScene extends Phaser.Scene {
     cardBg.strokeRoundedRect(-170, cardTop, 340, cardH, 24);
 
     const title = this.add
-      .text(0, cardTop + 42, 'GAME OVER !', {
+      .text(0, cardTop + 38, 'GAME OVER !', {
+        fontFamily: FONT_FAMILY,
         fontSize: '30px',
-        fontStyle: '900',
+        fontStyle: 'bold',
         color: '#ff3b5c',
       })
       .setOrigin(0.5);
 
     const scoreLbl = this.add
-      .text(0, cardTop + 88, 'SCORE FINAL', {
+      .text(0, cardTop + 76, 'SCORE FINAL', {
+        fontFamily: FONT_FAMILY,
         fontSize: '12px',
         fontStyle: 'bold',
         color: '#a5b4fc',
@@ -1037,24 +1155,45 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const scoreVal = this.add
-      .text(0, cardTop + 122, String(this.score), {
-        fontSize: '40px',
-        fontStyle: '900',
+      .text(0, cardTop + 108, String(this.score), {
+        fontFamily: FONT_FAMILY,
+        fontSize: '38px',
+        fontStyle: 'bold',
         color: '#ffffff',
       })
       .setOrigin(0.5);
 
     const bestVal = this.add
-      .text(0, cardTop + 160, `RECORD : ${this.bestScore}`, {
-        fontSize: '14px',
+      .text(0, cardTop + 142, `👑 RECORD : ${this.bestScore}`, {
+        fontFamily: FONT_FAMILY,
+        fontSize: '13px',
         fontStyle: 'bold',
         color: '#ffd166',
       })
       .setOrigin(0.5);
 
-    card.add([cardBg, title, scoreLbl, scoreVal, bestVal]);
+    // Rank & XP Progress Bar
+    const rankLabel = rankRes.leveledUp
+      ? `🎉 NIV. ${rankRes.level} (${rankRes.rankLabel})  +${rankRes.levelsGained} 🎁`
+      : `Niv. ${rankRes.level} • ${rankRes.rankLabel}  (+${xpEarned} XP)`;
+    const rankTxt = this.add
+      .text(0, cardTop + 172, rankLabel, {
+        fontFamily: FONT_FAMILY,
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: rankRes.leveledUp ? '#06d6a0' : '#9bf6ff',
+      })
+      .setOrigin(0.5);
 
-    let nextY = cardTop + 205;
+    const xpBarBg = this.add.graphics();
+    xpBarBg.fillStyle(0x0b0824, 0.9);
+    xpBarBg.fillRoundedRect(-120, cardTop + 188, 240, 10, 5);
+    xpBarBg.fillStyle(rankRes.leveledUp ? 0x06d6a0 : 0x39e5b6, 1);
+    xpBarBg.fillRoundedRect(-120, cardTop + 188, Math.max(10, 240 * rankRes.ratio), 10, 5);
+
+    card.add([cardBg, title, scoreLbl, scoreVal, bestVal, rankTxt, xpBarBg]);
+
+    let nextY = cardTop + 234;
 
     // 1. Rewarded Continue (1x per game)
     if (canContinue) {

@@ -9,12 +9,23 @@ const DEFAULT_DATA = {
   selectedTheme: 'cosmic',
   dailyStreak: 0,
   lastCompletedDate: '',
+  xp: 0,
+  level: 1,
+  freeTokens: 1,
   dailyChallenge: {
     date: '',
     completed: false,
     gamesToday: 0,
   },
 };
+
+const RANKS = [
+  { minLvl: 11, label: '🍉 Légende Pastèque' },
+  { minLvl: 8, label: '🍍 Maître Juicy' },
+  { minLvl: 5, label: '🍊 Chef Fruitier' },
+  { minLvl: 3, label: '🍒 Apprenti' },
+  { minLvl: 1, label: '🌱 Graine' },
+];
 
 const DAILY_POOL = [
   { id: 'score_2000', title: 'Atteindre 2 000 pts en une partie', type: 'score', target: 2000 },
@@ -156,6 +167,54 @@ class StorageManager {
         ? (this.data.dailyStreak || 0) + 1
         : Math.max(1, this.data.dailyStreak || 0);
       this.data.lastCompletedDate = today;
+      this.save();
+      return true;
+    }
+    return false;
+  }
+
+  getXpNeeded(level) {
+    return 400 + (level - 1) * 250;
+  }
+
+  getRankInfo() {
+    const level = this.data.level || 1;
+    const xp = this.data.xp || 0;
+    const needed = this.getXpNeeded(level);
+    const rankObj = RANKS.find((r) => level >= r.minLvl) || RANKS[RANKS.length - 1];
+    return {
+      level,
+      xp,
+      needed,
+      ratio: Math.min(1, xp / needed),
+      rankLabel: rankObj.label,
+      freeTokens: this.data.freeTokens ?? 0,
+    };
+  }
+
+  addXp(amount) {
+    if (amount <= 0) return { leveledUp: false, levelsGained: 0, ...this.getRankInfo() };
+    this.data.xp = (this.data.xp || 0) + amount;
+    this.data.level = this.data.level || 1;
+    let levelsGained = 0;
+
+    while (this.data.xp >= this.getXpNeeded(this.data.level)) {
+      this.data.xp -= this.getXpNeeded(this.data.level);
+      this.data.level += 1;
+      this.data.freeTokens = (this.data.freeTokens || 0) + 1;
+      levelsGained += 1;
+    }
+    this.save();
+    return { leveledUp: levelsGained > 0, levelsGained, ...this.getRankInfo() };
+  }
+
+  getFreeTokens() {
+    return this.data.freeTokens ?? 0;
+  }
+
+  consumeFreeToken() {
+    if ((this.data.freeTokens || 0) > 0) {
+      this.data.freeTokens -= 1;
       this.save();
       return true;
     }

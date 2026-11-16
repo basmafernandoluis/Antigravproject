@@ -14,7 +14,7 @@ const config = {
   physics: {
     default: 'matter',
     matter: {
-      gravity: { y: 1.15 },
+      gravity: { y: 1.38 },
       enableSleeping: false,
     },
   },
