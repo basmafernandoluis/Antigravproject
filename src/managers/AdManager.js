@@ -1,7 +1,8 @@
 import { Capacitor } from '@capacitor/core';
-import { AdMob, AdmobConsentStatus } from '@capacitor-community/admob';
+import { AdMob, AdmobConsentStatus, RewardAdPluginEvents } from '@capacitor-community/admob';
 import { AD_RULES, AD_UNIT_IDS, IS_TESTING_ADS } from '../config/ads.js';
 import { storageManager } from './StorageManager.js';
+import { firebaseManager } from './FirebaseManager.js';
 
 class AdManager {
   constructor() {
@@ -171,6 +172,10 @@ class AdManager {
       return true;
     }
 
+    let earnedReward = null;
+    let dismissHandle = null;
+    let failHandle = null;
+
     try {
       if (!this.rewardedReady) {
         await this.preloadRewarded();
@@ -180,18 +185,39 @@ class AdManager {
       }
 
       this.rewardedReady = false;
+
+      let resolveDismissed;
+      const dismissedPromise = new Promise((resolve) => {
+        resolveDismissed = resolve;
+      });
+      dismissHandle = await AdMob.addListener(RewardAdPluginEvents.Dismissed, resolveDismissed);
+      failHandle = await AdMob.addListener(RewardAdPluginEvents.FailedToShow, resolveDismissed);
+
       const rewardItem = await AdMob.showRewardVideoAd();
       if (rewardItem) {
+        earnedReward = rewardItem;
         firebaseManager.logEvent('ad_rewarded', { native: true });
-        onReward?.(rewardItem);
       }
+
+      // Wait until the user actually closes the ad (safety cap in case Dismissed never fires)
+      await Promise.race([
+        dismissedPromise,
+        new Promise((resolve) => setTimeout(resolve, 15000)),
+      ]);
     } catch (err) {
       console.warn('[AdManager] Rewarded show failed:', err);
       onError?.(err);
     } finally {
+      dismissHandle?.remove?.();
+      failHandle?.remove?.();
       this.isShowingAd = false;
       this.preloadRewarded();
       onDismiss?.();
+      if (earnedReward) {
+        setTimeout(() => {
+          onReward?.(earnedReward);
+        }, 80);
+      }
     }
     return true;
   }
