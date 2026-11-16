@@ -35,6 +35,7 @@ const REMOTE_DEFAULTS = {
 
 const PLAYER_ID_KEY = 'juicy_drop_player_id';
 const PLAYER_NAME_KEY = 'juicy_drop_player_name';
+const LAST_BEST_KEY = 'juicy_drop_last_fb_best';
 
 class FirebaseManager {
   constructor() {
@@ -141,40 +142,43 @@ class FirebaseManager {
     }
   }
 
-  async submitScore({ seasonPoints = 0, bestScore = 0, campaignLevel = 1 }) {
-    if (!this.db || !this.uid) return false;
+  async submitScore({ bestScore = 0, campaignLevel = 1 }) {
+    if (!this.db || !this.uid || bestScore <= 0) return false;
     try {
+      const lastBest = Number(localStorage.getItem(LAST_BEST_KEY) || 0);
+      if (bestScore <= lastBest) return false;
+
       const ref = doc(this.db, 'leaderboard', this.uid);
       await setDoc(
         ref,
         {
           name: this.getPlayerName(),
-          seasonPoints,
           bestScore,
           campaignLevel,
           updatedAt: serverTimestamp(),
         },
         { merge: true }
       );
+      localStorage.setItem(LAST_BEST_KEY, String(bestScore));
       return true;
     } catch {
       return false;
     }
   }
 
-  async fetchLeaderboard(playerSeasonPoints = 0, maxRows = 8) {
+  async fetchLeaderboard(playerBestScore = 0, maxRows = 8) {
     if (!this.db) {
-      return { rows: buildWeeklyLeaderboard(playerSeasonPoints), isLive: false };
+      return { rows: buildWeeklyLeaderboard(playerBestScore), isLive: false };
     }
     try {
       const q = query(
         collection(this.db, 'leaderboard'),
-        orderBy('seasonPoints', 'desc'),
+        orderBy('bestScore', 'desc'),
         limit(maxRows)
       );
       const snap = await getDocs(q);
       if (snap.empty) {
-        return { rows: buildWeeklyLeaderboard(playerSeasonPoints), isLive: false };
+        return { rows: buildWeeklyLeaderboard(playerBestScore), isLive: false };
       }
 
       const rows = [];
@@ -185,7 +189,7 @@ class FirebaseManager {
         if (isPlayer) playerIncluded = true;
         rows.push({
           name: d.name || 'Player',
-          pts: d.seasonPoints || 0,
+          pts: d.bestScore || 0,
           isPlayer,
         });
       });
@@ -193,7 +197,7 @@ class FirebaseManager {
       if (!playerIncluded) {
         rows.push({
           name: this.getPlayerName(),
-          pts: playerSeasonPoints,
+          pts: playerBestScore,
           isPlayer: true,
         });
       }
@@ -204,7 +208,7 @@ class FirebaseManager {
       return { rows: ranked, isLive: true };
     } catch {
       return {
-        rows: this.cachedBoard || buildWeeklyLeaderboard(playerSeasonPoints),
+        rows: this.cachedBoard || buildWeeklyLeaderboard(playerBestScore),
         isLive: Boolean(this.cachedBoard),
       };
     }

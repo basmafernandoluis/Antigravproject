@@ -2078,11 +2078,6 @@ export default class GameScene extends Phaser.Scene {
             haptics.levelWin();
             storageManager.claimQuest(q.id);
             firebaseManager.logEvent('quest_claimed', { quest_id: q.id });
-            firebaseManager.submitScore({
-              seasonPoints: storageManager.getSeasonPoints(),
-              bestScore: storageManager.getBestScore(),
-              campaignLevel: storageManager.getCampaignLevel(),
-            });
             this.spawnConfetti(GAME_WIDTH / 2, GAME_HEIGHT / 2, 24);
             this.refreshQuestBadge();
             this.refreshBoosterLabels();
@@ -2104,9 +2099,9 @@ export default class GameScene extends Phaser.Scene {
     };
     buildQuests();
 
-    // --- TAB 2: WEEKLY LEAGUE RANKING (Firestore Live + Offline Fallback) ---
-    const seasonPts = storageManager.getSeasonPoints();
-    const { current: curLeague, next: nextLeague } = getLeagueForPoints(seasonPts);
+    // --- TAB 2: BEST SCORE LEAGUE RANKING (Firestore Live + Offline Fallback) ---
+    const bestPts = storageManager.getBestScore();
+    const { current: curLeague, next: nextLeague } = getLeagueForPoints(bestPts);
 
     const renderLeagueBoard = (board, isLive = false) => {
       leagueGroup.removeAll(true);
@@ -2132,7 +2127,7 @@ export default class GameScene extends Phaser.Scene {
         .text(
           0,
           -136,
-          `${t('yourRank', { rank: playerRow.rank })}  •  ${seasonPts} pts${
+          `${t('yourRank', { rank: playerRow.rank })}  •  ${bestPts} pts${
             nextLeague ? `  (➜ ${nextLeague.icon} ${nextLeague.minPts})` : ''
           }`,
           {
@@ -2175,8 +2170,8 @@ export default class GameScene extends Phaser.Scene {
       });
     };
 
-    renderLeagueBoard(buildWeeklyLeaderboard(seasonPts), false);
-    firebaseManager.fetchLeaderboard(seasonPts, 8).then(({ rows, isLive }) => {
+    renderLeagueBoard(buildWeeklyLeaderboard(bestPts), false);
+    firebaseManager.fetchLeaderboard(bestPts, 8).then(({ rows, isLive }) => {
       if (!card.scene) return;
       renderLeagueBoard(rows, isLive);
     });
