@@ -155,7 +155,7 @@ class AdManager {
     return true;
   }
 
-  async showRewarded({ onStart, onReward, onDismiss, onError } = {}) {
+  async showRewarded({ onStart, onReward, onDismiss, onNoReward, onError } = {}) {
     if (this.isShowingAd) return false;
 
     this.isShowingAd = true;
@@ -165,7 +165,11 @@ class AdManager {
       // Web simulation: reward granted after short delay
       setTimeout(() => {
         this.isShowingAd = false;
-        firebaseManager.logEvent('ad_rewarded', { native: false });
+        try {
+          firebaseManager.logEvent('ad_rewarded', { native: false });
+        } catch {
+          // Ignore
+        }
         onReward?.();
         onDismiss?.();
       }, 350);
@@ -177,6 +181,7 @@ class AdManager {
     let dismissHandle = null;
     let failHandle = null;
     let safetyTimer = null;
+    let hadError = false;
 
     try {
       if (!this.rewardedReady) {
@@ -222,6 +227,11 @@ class AdManager {
         }),
       ]);
 
+      // Give Capacitor bridge 300ms to flush Rewarded if Dismissed arrived first
+      if (!earnedReward) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+
       if (earnedReward) {
         try {
           firebaseManager.logEvent('ad_rewarded', { native: true });
@@ -230,6 +240,7 @@ class AdManager {
         }
       }
     } catch (err) {
+      hadError = true;
       console.warn('[AdManager] Rewarded show failed:', err);
       onError?.(err);
     } finally {
@@ -242,6 +253,8 @@ class AdManager {
       onDismiss?.();
       if (earnedReward) {
         onReward?.(earnedReward);
+      } else if (!hadError) {
+        onNoReward?.();
       }
     }
     return true;

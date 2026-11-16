@@ -1679,8 +1679,10 @@ export default class GameScene extends Phaser.Scene {
 
     adManager.showRewarded({
       onStart: () => this.pauseForAd(),
-      onReward: () => this.time.delayedCall(60, () => this._executeShake()),
+      onReward: () => this._executeShake(),
       onDismiss: () => this.resumeFromAd(),
+      onNoReward: () => this.showToast('⚠️ Pub fermée trop tôt'),
+      onError: () => this.showToast('⚠️ Pub indisponible'),
     });
   }
 
@@ -1703,8 +1705,10 @@ export default class GameScene extends Phaser.Scene {
 
     adManager.showRewarded({
       onStart: () => this.pauseForAd(),
-      onReward: () => this.time.delayedCall(60, () => this._executePin()),
+      onReward: () => this._executePin(),
       onDismiss: () => this.resumeFromAd(),
+      onNoReward: () => this.showToast('⚠️ Pub fermée trop tôt'),
+      onError: () => this.showToast('⚠️ Pub indisponible'),
     });
   }
 
