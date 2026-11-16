@@ -3,9 +3,13 @@ import { FRUITS, MAX_SPAWN_TIER } from '../config/fruits.js';
 import { AD_RULES } from '../config/ads.js';
 import { generateGameTextures } from '../utils/textures.js';
 import { soundFX } from '../utils/sound.js';
+import { haptics } from '../utils/haptics.js';
 import { adManager } from '../managers/AdManager.js';
 import { storageManager } from '../managers/StorageManager.js';
 import { THEMES, getThemeById } from '../config/themes.js';
+import { t, getFruitName, SUPPORTED_LANGS } from '../config/i18n.js';
+import { getLevelConfig } from '../config/levels.js';
+import { getLeagueForPoints, buildWeeklyLeaderboard } from '../config/leagues.js';
 
 const GAME_WIDTH = 480;
 const GAME_HEIGHT = 854;
@@ -23,15 +27,15 @@ const DROP_Y = 212;
 const CONFETTI_COLORS = [0xff3b5c, 0xffd166, 0x06d6a0, 0x118ab2, 0x9b5de5, 0xff7b00];
 
 const RUN_MISSIONS = [
-  { type: 'tier', target: 4, label: 'Crée 1 Orange', reward: 150 },
-  { type: 'combo', target: 2, label: 'Fais un Combo ×2', reward: 200 },
-  { type: 'tier', target: 5, label: 'Crée 1 Pomme', reward: 250 },
-  { type: 'score', target: 1500, label: 'Atteins 1 500 pts', reward: 300 },
-  { type: 'tier', target: 7, label: 'Crée 1 Pêche', reward: 400 },
-  { type: 'combo', target: 3, label: 'Fais un Combo ×3', reward: 450 },
-  { type: 'score', target: 4000, label: 'Atteins 4 000 pts', reward: 600 },
-  { type: 'tier', target: 9, label: 'Crée 1 Melon', reward: 800 },
-  { type: 'tier', target: 10, label: 'Crée la Pastèque !', reward: 1500 },
+  { type: 'tier', target: 4, reward: 150 },
+  { type: 'combo', target: 2, reward: 200 },
+  { type: 'tier', target: 5, reward: 250 },
+  { type: 'score', target: 1500, reward: 300 },
+  { type: 'tier', target: 7, reward: 400 },
+  { type: 'combo', target: 3, reward: 450 },
+  { type: 'score', target: 4000, reward: 600 },
+  { type: 'tier', target: 9, reward: 800 },
+  { type: 'tier', target: 10, reward: 1500 },
 ];
 
 export default class GameScene extends Phaser.Scene {
@@ -42,9 +46,14 @@ export default class GameScene extends Phaser.Scene {
   create() {
     generateGameTextures(this);
     adManager.init();
+    haptics.setEnabled(storageManager.isHapticsEnabled());
 
     this.score = 0;
     this.bestScore = storageManager.getBestScore();
+    this.gameMode = storageManager.getGameMode();
+    this.campaignLevel = storageManager.getCampaignLevel();
+    this.levelCfg = getLevelConfig(this.campaignLevel);
+    this.movesLeft = this.levelCfg.maxMoves;
     this.isGameOver = false;
     this.canDrop = true;
     this.pinMode = false;
@@ -53,7 +62,9 @@ export default class GameScene extends Phaser.Scene {
     this.comboCount = 0;
     this.lastMergeTime = 0;
     this.dangerTimer = 0;
+    this.lastDangerTick = 0;
     this.missionIndex = 0;
+    this.eliteGoalScore = 6000;
     this.fruits = [];
     this.gameOverObjects = [];
 
@@ -74,7 +85,8 @@ export default class GameScene extends Phaser.Scene {
     // First-time micro-tutorial
     if (storageManager.getGamesPlayed() === 0) {
       this.tutorialHint = this.add
-        .text(GAME_WIDTH / 2, JAR_TOP + 120, '👆 GLISSE POUR VISER\nRELÂCHE POUR LÂCHER !', {
+        .text(GAME_WIDTH / 2, JAR_TOP + 120, t('tutorialHint'), {
+          fontFamily: FONT_FAMILY,
           fontSize: '16px',
           fontStyle: 'bold',
           color: '#ffffff',
@@ -124,11 +136,24 @@ export default class GameScene extends Phaser.Scene {
     this.bgGraphics.fillGradientStyle(theme.bgTop, theme.bgTop, theme.bgBottom, theme.bgBottom, 1);
     this.bgGraphics.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
+    // Sync outer HTML body background so 20:9 phones (S22) have zero letterbox seam
+    if (typeof document !== 'undefined' && document.body) {
+      const topHex = `#${theme.bgTop.toString(16).padStart(6, '0')}`;
+      const botHex = `#${theme.bgBottom.toString(16).padStart(6, '0')}`;
+      document.body.style.background = `linear-gradient(180deg, ${topHex} 0%, ${botHex} 100%)`;
+    }
+
     // Warm ambient spotlight behind jar for depth
     this.bgGraphics.fillStyle(theme.glowColor, 0.12);
     this.bgGraphics.fillCircle(GAME_WIDTH / 2, JAR_TOP + 220, 230);
     this.bgGraphics.fillStyle(0xffffff, 0.04);
     this.bgGraphics.fillCircle(GAME_WIDTH / 2, JAR_TOP + 220, 145);
+
+    if (!this.dangerVignette) {
+      this.dangerVignette = this.add.graphics().setDepth(18).setAlpha(0);
+      this.dangerVignette.lineStyle(18, 0xff3b5c, 0.75);
+      this.dangerVignette.strokeRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    }
   }
 
   createJar() {
@@ -179,7 +204,7 @@ export default class GameScene extends Phaser.Scene {
     badgeBg.lineStyle(1.5, 0xff4d6d, 0.85);
     badgeBg.strokeRoundedRect(-34, -10, 68, 20, 10);
     this.dangerLabel = this.add
-      .text(0, 0, '⚠ LIMITE', {
+      .text(0, 0, t('limit'), {
         fontFamily: FONT_FAMILY,
         fontSize: '10px',
         fontStyle: 'bold',
@@ -303,11 +328,14 @@ export default class GameScene extends Phaser.Scene {
       return { container, txt };
     };
 
-    makeIconBtn(GAME_WIDTH - 142, 40, '🏆', 0x06d6a0, 0x048a66, () => {
+    const trophyObj = makeIconBtn(GAME_WIDTH - 142, 40, '🏆', 0x06d6a0, 0x048a66, () => {
       if (!this.isGameOver) {
         this.openRetentionModal();
       }
     });
+    this.questBadgeDot = this.add.circle(16, -16, 6, 0xff3b5c, 1).setStrokeStyle(1.5, 0xffffff, 1);
+    trophyObj.container.add(this.questBadgeDot);
+    this.refreshQuestBadge();
 
     const muteObj = makeIconBtn(GAME_WIDTH - 92, 40, soundFX.muted ? '🔇' : '🔊', 0x4361ee, 0x243496, (txt) => {
       const muted = soundFX.toggleMute();
@@ -332,7 +360,7 @@ export default class GameScene extends Phaser.Scene {
     scoreBg.lineStyle(2, 0x9bf6ff, 0.65);
     scoreBg.strokeRoundedRect(24, 74, 166, 68, 18);
 
-    this.add.text(36, 82, 'SCORE', {
+    this.add.text(36, 82, t('score'), {
       fontFamily: FONT_FAMILY,
       fontSize: '12px',
       fontStyle: 'bold',
@@ -369,7 +397,7 @@ export default class GameScene extends Phaser.Scene {
     nextBg.strokeRoundedRect(GAME_WIDTH - 122, 74, 98, 68, 18);
 
     this.add
-      .text(GAME_WIDTH - 73, 81, 'SUIVANT', {
+      .text(GAME_WIDTH - 73, 81, t('next'), {
         fontFamily: FONT_FAMILY,
         fontSize: '11px',
         fontStyle: 'bold',
@@ -383,12 +411,8 @@ export default class GameScene extends Phaser.Scene {
     // Rewarded Booster Pills (aligned neatly between Score & Next)
     this.createBoosterButtons();
 
-    // Live Quick Mission Pill (right below HUD, safely above DROP_Y)
-    const mBg = this.add.graphics();
-    mBg.fillStyle(0x1e224d, 0.9);
-    mBg.fillRoundedRect(24, 146, GAME_WIDTH - 48, 24, 12);
-    mBg.lineStyle(1.5, 0xffd166, 0.55);
-    mBg.strokeRoundedRect(24, 146, GAME_WIDTH - 48, 24, 12);
+    // Live Level Goal / Mission Pill (right below HUD, safely above DROP_Y)
+    this.missionPillBg = this.add.graphics();
     this.missionText = this.add
       .text(GAME_WIDTH / 2, 158, '', {
         fontFamily: FONT_FAMILY,
@@ -401,9 +425,10 @@ export default class GameScene extends Phaser.Scene {
 
     // Pin Mode Hint Banner
     this.pinBanner = this.add
-      .text(GAME_WIDTH / 2, DROP_Y - 26, '📌 TOUCHEZ UN FRUIT À DÉTRUIRE', {
-        fontSize: '15px',
-        fontStyle: '900',
+      .text(GAME_WIDTH / 2, DROP_Y - 26, t('pinModeBanner'), {
+        fontFamily: FONT_FAMILY,
+        fontSize: '14px',
+        fontStyle: 'bold',
         color: '#ffd166',
         backgroundColor: '#1b1e3f',
         padding: { x: 14, y: 7 },
@@ -420,14 +445,45 @@ export default class GameScene extends Phaser.Scene {
     this.createEvolutionBar();
   }
 
+  refreshQuestBadge() {
+    if (!this.questBadgeDot) return;
+    this.questBadgeDot.setVisible(storageManager.hasClaimableQuests());
+  }
+
   updateMissionPill() {
-    if (!this.missionText) return;
-    const m = RUN_MISSIONS[this.missionIndex];
-    if (!m) {
-      this.missionText.setText('🌟 TOUTES LES MISSIONS VALIDÉES !');
+    if (!this.missionText || !this.missionPillBg) return;
+
+    const isLowMoves = this.gameMode === 'levels' && this.movesLeft <= 4;
+    this.missionPillBg.clear();
+    this.missionPillBg.fillStyle(isLowMoves ? 0x590d22 : 0x1e224d, 0.92);
+    this.missionPillBg.fillRoundedRect(24, 146, GAME_WIDTH - 48, 24, 12);
+    this.missionPillBg.lineStyle(1.5, isLowMoves ? 0xff4d6d : 0xffd166, 0.75);
+    this.missionPillBg.strokeRoundedRect(24, 146, GAME_WIDTH - 48, 24, 12);
+
+    if (this.gameMode === 'levels') {
+      const fruitName = getFruitName(this.levelCfg.targetTier);
+      const scorePart = this.levelCfg.minScore > 0 ? ` · ${this.score}/${this.levelCfg.minScore}` : '';
+      this.missionText.setColor(isLowMoves ? '#ffccd5' : '#ffd166');
+      this.missionText.setText(
+        `${t('levelShort')} ${this.campaignLevel} · ${t('goalFruitMoves', {
+          fruit: fruitName,
+          moves: this.movesLeft,
+        })}${scorePart}`
+      );
       return;
     }
-    this.missionText.setText(`🎯 Mission : ${m.label}  (+${m.reward} pts)`);
+
+    const m = RUN_MISSIONS[this.missionIndex];
+    this.missionText.setColor('#ffd166');
+    if (!m) {
+      this.missionText.setText(`👑 ${t('endless')} · ${t('goalScore', { score: this.eliteGoalScore })}`);
+      return;
+    }
+    let label = '';
+    if (m.type === 'tier') label = getFruitName(m.target);
+    else if (m.type === 'combo') label = `Combo ×${m.target}`;
+    else label = `${m.target} pts`;
+    this.missionText.setText(`♾️ ${t('endless')} · 🎯 ${label} (+${m.reward})`);
   }
 
   createBoosterButtons() {
@@ -443,16 +499,16 @@ export default class GameScene extends Phaser.Scene {
       bg.fillStyle(fillColor, 1);
       bg.fillRoundedRect(-w / 2, -h / 2, w, h, 15);
       // Subtle top glossy highlight
-      bg.fillStyle(0xffffff, 0.14);
+      bg.fillStyle(0xffffff, 0.16);
       bg.fillRoundedRect(-w / 2 + 8, -h / 2 + 2, w - 16, 7, 3);
       // Crisp border
-      bg.lineStyle(1.5, 0xffffff, 0.4);
+      bg.lineStyle(1.5, 0xffffff, 0.45);
       bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 15);
 
       const txt = this.add
         .text(0, 0, label, {
           fontFamily: FONT_FAMILY,
-          fontSize: '13px',
+          fontSize: '12px',
           fontStyle: 'bold',
           color: '#ffffff',
         })
@@ -470,8 +526,8 @@ export default class GameScene extends Phaser.Scene {
       return { container, txt };
     };
 
-    const shakeObj = makeArcadePill(274, 88, '🎬 SECOUER', 0x7b2cbf, 0x3c096c, () => this.triggerShakeBooster());
-    const pinObj = makeArcadePill(274, 125, '🎬 ÉPINGLE', 0xff3b5c, 0xa4133c, () => this.triggerPinBooster());
+    const shakeObj = makeArcadePill(274, 88, '', 0x7b2cbf, 0x3c096c, () => this.triggerShakeBooster());
+    const pinObj = makeArcadePill(274, 125, '', 0xff3b5c, 0xa4133c, () => this.triggerPinBooster());
     this.shakeContainer = shakeObj.container;
     this.pinContainer = pinObj.container;
     this.shakeBtnTxt = shakeObj.txt;
@@ -483,16 +539,16 @@ export default class GameScene extends Phaser.Scene {
 
   refreshBoosterLabels() {
     const tokens = storageManager.getFreeTokens();
-    const prefix = tokens > 0 ? '🎁' : '🎬';
+    const prefix = tokens > 0 ? '🎁' : '▶';
     const suffix = tokens > 0 ? ` (${tokens})` : '';
     if (this.shakeBtnTxt) {
       this.shakeBtnTxt.setText(
-        this.shakeNudged ? `${prefix} FUSION AUTO !` : `${prefix} SECOUER${suffix}`
+        this.shakeNudged ? `${prefix} ${t('autoMerge')}` : `${prefix} ${t('shake')}${suffix}`
       );
     }
     if (this.pinBtnTxt) {
       this.pinBtnTxt.setText(
-        this.pinNudged ? `${prefix} SAUVE-TOI !` : `${prefix} ÉPINGLE${suffix}`
+        this.pinNudged ? `${prefix} ${t('saveMe')}` : `${prefix} ${t('pin')}${suffix}`
       );
     }
   }
@@ -615,16 +671,15 @@ export default class GameScene extends Phaser.Scene {
       maxTier = Math.min(FRUITS.length - 1, MAX_SPAWN_TIER + 2);
       if (this.spawnTierStage < 2) {
         this.spawnTierStage = 2;
-        this.showToast('⚡ NIVEAU SUP : Poire débloquée !');
+        this.showToast(t('unlockPear'));
       }
     } else if (this.score >= 600) {
       maxTier = Math.min(FRUITS.length - 1, MAX_SPAWN_TIER + 1);
       if (this.spawnTierStage < 1) {
         this.spawnTierStage = 1;
-        this.showToast('🍎 ACCÉLÉRATION : Pomme débloquée !');
+        this.showToast(t('unlockApple'));
       }
     }
-    // Slightly reduce tiny Cerise spam once mid-game is reached
     if (this.score >= 1200 && Math.random() < 0.7) {
       return Phaser.Math.Between(1, maxTier);
     }
@@ -633,6 +688,8 @@ export default class GameScene extends Phaser.Scene {
 
   prepareNextDrop() {
     if (this.isGameOver) return;
+    if (this.gameMode === 'levels' && this.movesLeft <= 0) return;
+
     this.currentTier = this.nextTier;
     this.nextTier = this.pickNextSpawnTier();
 
@@ -683,7 +740,21 @@ export default class GameScene extends Phaser.Scene {
     }
 
     soundFX.playDrop();
+    haptics.drop();
     this.spawnPhysicsFruit(this.aimX, DROP_Y, this.currentTier, false);
+
+    if (this.gameMode === 'levels') {
+      this.movesLeft = Math.max(0, this.movesLeft - 1);
+      this.updateMissionPill();
+      if (this.movesLeft === 0) {
+        this.time.delayedCall(1200, () => {
+          if (!this.isGameOver) {
+            this.triggerGameOver('out_of_moves');
+          }
+        });
+        return;
+      }
+    }
 
     this.time.delayedCall(420, () => {
       if (!this.isGameOver) {
@@ -747,8 +818,8 @@ export default class GameScene extends Phaser.Scene {
             if (targetObj && targetObj.active && targetObj.getData('tier') !== undefined) {
               this.tweens.add({
                 targets: targetObj,
-                scaleX: 1.12,
-                scaleY: 0.88,
+                scaleX: 1.14,
+                scaleY: 0.86,
                 duration: 65,
                 yoyo: true,
               });
@@ -768,6 +839,54 @@ export default class GameScene extends Phaser.Scene {
           this.handleMerge(objA, objB, tierA);
         }
       }
+    });
+  }
+
+  flashScreen(color = 0xffffff, maxAlpha = 0.28) {
+    const flash = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, color, maxAlpha)
+      .setDepth(25);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 220,
+      ease: 'Cubic.easeOut',
+      onComplete: () => flash.destroy(),
+    });
+  }
+
+  showCallout(text, color = '#ffd166') {
+    const txt = this.add
+      .text(GAME_WIDTH / 2, JAR_TOP + 62, text, {
+        fontFamily: FONT_FAMILY,
+        fontSize: '26px',
+        fontStyle: 'bold',
+        color,
+        stroke: '#0d0e22',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setDepth(16)
+      .setScale(0.5)
+      .setAlpha(0);
+
+    this.tweens.add({
+      targets: txt,
+      scale: 1.08,
+      alpha: 1,
+      duration: 180,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.time.delayedCall(520, () => {
+          this.tweens.add({
+            targets: txt,
+            y: txt.y - 28,
+            alpha: 0,
+            duration: 260,
+            onComplete: () => txt.destroy(),
+          });
+        });
+      },
     });
   }
 
@@ -798,11 +917,17 @@ export default class GameScene extends Phaser.Scene {
         this.bestScore = this.score;
         this.bestText.setText(`👑 ${this.bestScore}`);
       }
-      soundFX.playMerge(tier, this.comboCount + 1);
+      soundFX.playLevelWin();
+      haptics.levelWin();
+      this.flashScreen(0xffd166, 0.42);
       this.cameras.main.shake(360, 0.024);
       this.spawnConfetti(midX, midY, 55);
-      this.showToast(`🍉 EXPLOSION MYTHIQUE ! +${bonus}`);
+      this.showToast(t('mythicToast', { bonus }));
+      this.showCallout(t('calloutLegend'), '#80ffdb');
+      storageManager.recordDailyProgress({ score: this.score, maxTier: tier, combo: this.comboCount });
+      this.refreshQuestBadge();
       this.checkRunMission({ tier, combo: this.comboCount, score: this.score });
+      this.checkLevelWin(tier);
       return;
     }
 
@@ -825,7 +950,12 @@ export default class GameScene extends Phaser.Scene {
       this.bestScore = this.score;
       this.bestText.setText(`👑 ${this.bestScore}`);
     }
+    storageManager.recordDailyProgress({ score: this.score, maxTier: nextTier, combo: this.comboCount });
+    this.refreshQuestBadge();
     this.checkRunMission({ tier: nextTier, combo: this.comboCount, score: this.score });
+    if (this.gameMode === 'levels') {
+      this.updateMissionPill();
+    }
     if (storageManager.updateMaxTier(nextTier)) {
       const unlockedIcon = this.evolutionIcons?.[nextTier];
       if (unlockedIcon) {
@@ -846,8 +976,24 @@ export default class GameScene extends Phaser.Scene {
 
     // --- GAME FEEL: Audio, Haptics, Flash, Screen Shake, Shockwaves, Particles, Confetti ---
     soundFX.playMerge(nextTier, this.comboCount);
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(nextTier >= 4 ? [18, 25, 22] : 16);
+    haptics.merge(nextTier, this.comboCount);
+
+    if (nextTier >= 6 || this.comboCount >= 3) {
+      this.flashScreen(FRUITS[nextTier].highlight, nextTier >= 8 ? 0.3 : 0.16);
+    }
+    if (this.comboCount >= 4) {
+      soundFX.playComboBanner();
+      this.showCallout(t('calloutLegend'), '#ff8fab');
+    } else if (this.comboCount === 3) {
+      soundFX.playComboBanner();
+      this.showCallout(t('calloutMega'), '#ffd166');
+    } else if (this.comboCount === 2 && nextTier >= 4) {
+      this.showCallout(t('calloutSuper'), '#9bf6ff');
+    }
+
+    // Check Campaign Level Victory
+    if (this.checkLevelWin(nextTier)) {
+      return;
     }
 
     // 1. Screen Shake scaled by tier & combo
@@ -1031,9 +1177,17 @@ export default class GameScene extends Phaser.Scene {
       this.dangerBarBg.setVisible(true);
       this.dangerBarFill.setVisible(true);
       this.dangerBarFill.width = 180 * ratio;
+      if (this.dangerVignette) {
+        this.dangerVignette.setAlpha(0.25 + 0.45 * Math.abs(Math.sin(now * 0.014)));
+      }
+      if (now - this.lastDangerTick > 320) {
+        this.lastDangerTick = now;
+        soundFX.playDangerTick();
+        haptics.dangerTick();
+      }
 
       if (this.dangerTimer >= 1200) {
-        this.triggerGameOver();
+        this.triggerGameOver('overflow');
       }
     } else {
       if (this.dangerTimer > 0) {
@@ -1044,13 +1198,25 @@ export default class GameScene extends Phaser.Scene {
         this.dangerBadge.setAlpha(0.85);
         this.dangerBarBg.setVisible(false);
         this.dangerBarFill.setVisible(false);
+        if (this.dangerVignette) this.dangerVignette.setAlpha(0);
       }
     }
   }
 
   checkRunMission({ tier = 0, combo = 0, score = 0 }) {
+    if (this.gameMode !== 'endless') return;
     const m = RUN_MISSIONS[this.missionIndex];
-    if (!m) return;
+    if (!m) {
+      if (score >= this.eliteGoalScore) {
+        this.score += 500;
+        this.scoreText.setText(String(this.score));
+        this.eliteGoalScore += 3000;
+        this.spawnConfetti(GAME_WIDTH / 2, JAR_TOP + 30, 24);
+        this.showToast('👑 +500 pts');
+        this.updateMissionPill();
+      }
+      return;
+    }
 
     let done = false;
     if (m.type === 'tier' && tier >= m.target) done = true;
@@ -1064,11 +1230,122 @@ export default class GameScene extends Phaser.Scene {
         this.bestScore = this.score;
         this.bestText.setText(`👑 ${this.bestScore}`);
       }
-      this.showToast(`🎯 MISSION VALIDÉE ! +${m.reward} pts`);
+      this.showToast(`🎯 +${m.reward} pts`);
       this.spawnConfetti(GAME_WIDTH / 2, JAR_TOP + 30, 22);
       this.missionIndex += 1;
       this.updateMissionPill();
     }
+  }
+
+  checkLevelWin(createdTier) {
+    if (this.gameMode !== 'levels' || this.isGameOver) return false;
+    if (createdTier >= this.levelCfg.targetTier && this.score >= this.levelCfg.minScore) {
+      this.triggerLevelWin();
+      return true;
+    }
+    return false;
+  }
+
+  triggerLevelWin() {
+    this.isGameOver = true;
+    this.canDrop = false;
+    this.pinMode = false;
+    this.pinBanner.setVisible(false);
+    this.aimLine.clear();
+    this.dropperFruit.setVisible(false);
+    if (this.dangerVignette) this.dangerVignette.setAlpha(0);
+
+    const stars =
+      this.movesLeft >= this.levelCfg.star3Left
+        ? 3
+        : this.movesLeft >= this.levelCfg.star2Left
+        ? 2
+        : 1;
+
+    storageManager.completeCampaignLevel(this.campaignLevel, stars);
+    storageManager.incrementGamesPlayed();
+    storageManager.addXp(100 + stars * 40);
+    storageManager.recordDailyProgress({ score: this.score, maxTier: this.levelCfg.targetTier, gameEnded: true });
+    this.refreshQuestBadge();
+    this.refreshBoosterLabels();
+
+    soundFX.playLevelWin();
+    haptics.levelWin();
+    this.flashScreen(0xffd166, 0.45);
+    this.spawnConfetti(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 80, 55);
+
+    const overlay = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.8)
+      .setDepth(20);
+
+    const card = this.add
+      .container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+      .setDepth(22)
+      .setScale(0.65)
+      .setAlpha(0);
+
+    const cardBg = this.add.graphics();
+    cardBg.fillStyle(0x1b1e3f, 1);
+    cardBg.fillRoundedRect(-175, -195, 350, 390, 26);
+    cardBg.lineStyle(3, 0xffd166, 0.95);
+    cardBg.strokeRoundedRect(-175, -195, 350, 390, 26);
+
+    const starsStr = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+    const starsTxt = this.add.text(0, -142, starsStr, { fontSize: '42px' }).setOrigin(0.5);
+
+    const title = this.add
+      .text(0, -86, t('levelWinTitle', { n: this.campaignLevel }), {
+        fontFamily: FONT_FAMILY,
+        fontSize: '25px',
+        fontStyle: 'bold',
+        color: '#06d6a0',
+      })
+      .setOrigin(0.5);
+
+    const sub = this.add
+      .text(0, -46, t('levelWinSub', { left: this.movesLeft }), {
+        fontFamily: FONT_FAMILY,
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color: '#cbd5ff',
+        wordWrap: { width: 300 },
+        align: 'center',
+      })
+      .setOrigin(0.5);
+
+    const scoreVal = this.add
+      .text(0, 6, t('finalScore', { score: this.score }), {
+        fontFamily: FONT_FAMILY,
+        fontSize: '24px',
+        fontStyle: 'bold',
+        color: '#ffd166',
+      })
+      .setOrigin(0.5);
+
+    const nextBtn = this.makeModalButton(0, 82, t('nextLevelBtn'), 0x06d6a0, '#0b132b', () => {
+      adManager.showInterstitialIfEligible({
+        onStart: () => this.pauseForAd(),
+        onDismiss: () => {
+          this.resumeFromAd();
+          this.scene.restart();
+        },
+      });
+    });
+
+    const replayBtn = this.makeModalButton(0, 144, t('replayBtn'), 0x3a0ca3, '#ffffff', () => {
+      this.scene.restart();
+    });
+
+    card.add([cardBg, starsTxt, title, sub, scoreVal, nextBtn, replayBtn]);
+    this.gameOverObjects = [overlay, card];
+
+    this.tweens.add({
+      targets: card,
+      scale: 1,
+      alpha: 1,
+      duration: 240,
+      ease: 'Back.easeOut',
+    });
   }
 
   pauseForAd() {
@@ -1242,7 +1519,8 @@ export default class GameScene extends Phaser.Scene {
     this.drawAimLine();
   }
 
-  triggerGameOver() {
+  triggerGameOver(reason = 'overflow') {
+    if (this.isGameOver) return;
     this.isGameOver = true;
     this.canDrop = false;
     this.pinMode = false;
@@ -1251,15 +1529,19 @@ export default class GameScene extends Phaser.Scene {
     this.dropperFruit.setVisible(false);
     this.dangerBarBg.setVisible(false);
     this.dangerBarFill.setVisible(false);
+    if (this.dangerVignette) this.dangerVignette.setAlpha(0);
 
     storageManager.incrementGamesPlayed();
+    storageManager.addSeasonPoints(Math.round(this.score / 25));
     storageManager.recordDailyProgress({ score: this.score, gameEnded: true });
     const xpEarned = Math.max(25, Math.round(this.score / 12));
     const rankRes = storageManager.addXp(xpEarned);
+    this.refreshQuestBadge();
     if (rankRes.leveledUp) {
       this.refreshBoosterLabels();
     }
     soundFX.playGameOver();
+    haptics.gameOver();
     this.cameras.main.shake(300, 0.015);
 
     // Darken backdrop
@@ -1272,8 +1554,9 @@ export default class GameScene extends Phaser.Scene {
       duration: 220,
     });
 
+    const isOutOfMoves = reason === 'out_of_moves';
     const canContinue =
-      this.continuesUsed < AD_RULES.MAX_CONTINUES_PER_GAME && this.fruits.length > 0;
+      this.continuesUsed < AD_RULES.MAX_CONTINUES_PER_GAME && (isOutOfMoves || this.fruits.length > 0);
     const canDoubleScore = !this.scoreDoubled && this.score > 0;
 
     // Modal Card
@@ -1293,16 +1576,16 @@ export default class GameScene extends Phaser.Scene {
     cardBg.strokeRoundedRect(-170, cardTop, 340, cardH, 24);
 
     const title = this.add
-      .text(0, cardTop + 38, 'GAME OVER !', {
+      .text(0, cardTop + 38, isOutOfMoves ? t('outOfMovesTitle') : t('gameOverTitle'), {
         fontFamily: FONT_FAMILY,
-        fontSize: '30px',
+        fontSize: '26px',
         fontStyle: 'bold',
         color: '#ff3b5c',
       })
       .setOrigin(0.5);
 
     const scoreLbl = this.add
-      .text(0, cardTop + 76, 'SCORE FINAL', {
+      .text(0, cardTop + 76, t('score'), {
         fontFamily: FONT_FAMILY,
         fontSize: '12px',
         fontStyle: 'bold',
@@ -1320,7 +1603,7 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const bestVal = this.add
-      .text(0, cardTop + 142, `👑 RECORD : ${this.bestScore}`, {
+      .text(0, cardTop + 142, `👑 ${t('bestScore', { best: this.bestScore })}`, {
         fontFamily: FONT_FAMILY,
         fontSize: '13px',
         fontStyle: 'bold',
@@ -1353,8 +1636,9 @@ export default class GameScene extends Phaser.Scene {
 
     // 1. Rewarded Continue (1x per game)
     if (canContinue) {
-      const contBtn = this.makeModalButton(0, nextY, '🎬  CONTINUER (1x)', 0xff9f1c, '#0b132b', () => {
-        this.handleContinue();
+      const contLabel = isOutOfMoves ? t('continueMovesAd') : t('continueShakeAd');
+      const contBtn = this.makeModalButton(0, nextY, contLabel, 0xff9f1c, '#0b132b', () => {
+        this.handleContinue(reason);
       });
       card.add(contBtn);
       nextY += 58;
@@ -1362,7 +1646,7 @@ export default class GameScene extends Phaser.Scene {
 
     // 2. Rewarded Score x2
     if (canDoubleScore) {
-      const x2Btn = this.makeModalButton(0, nextY, '🎬  SCORE x2', 0x7209b7, '#ffffff', () => {
+      const x2Btn = this.makeModalButton(0, nextY, t('doubleScoreAd'), 0x7209b7, '#ffffff', () => {
         adManager.showRewarded({
           onStart: () => this.pauseForAd(),
           onReward: () => {
@@ -1372,8 +1656,8 @@ export default class GameScene extends Phaser.Scene {
             scoreVal.setText(String(this.score));
             if (storageManager.updateBestScore(this.score)) {
               this.bestScore = this.score;
-              this.bestText.setText(`MAX ${this.bestScore}`);
-              bestVal.setText(`RECORD : ${this.bestScore}`);
+              this.bestText.setText(`👑 ${this.bestScore}`);
+              bestVal.setText(`👑 ${t('bestScore', { best: this.bestScore })}`);
             }
             x2Btn.destroy();
             this.spawnConfetti(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, 35);
@@ -1386,7 +1670,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // 3. Instant "REJOUER" Button (triggers Interstitial if eligible)
-    const replayBtn = this.makeModalButton(0, nextY, '↻  REJOUER', 0x06d6a0, '#0b132b', () => {
+    const replayBtn = this.makeModalButton(0, nextY, `↻  ${t('replayBtn')}`, 0x06d6a0, '#0b132b', () => {
       adManager.showInterstitialIfEligible({
         onStart: () => this.pauseForAd(),
         onDismiss: () => {
@@ -1433,8 +1717,9 @@ export default class GameScene extends Phaser.Scene {
 
     const txt = this.add
       .text(0, -1, label, {
-        fontSize: '18px',
-        fontStyle: '900',
+        fontFamily: FONT_FAMILY,
+        fontSize: '16px',
+        fontStyle: 'bold',
         color: textColor,
       })
       .setOrigin(0.5);
@@ -1450,19 +1735,24 @@ export default class GameScene extends Phaser.Scene {
     return container;
   }
 
-  handleContinue() {
+  handleContinue(reason = 'overflow') {
     adManager.showRewarded({
       onStart: () => this.pauseForAd(),
       onReward: () => {
         this.continuesUsed += 1;
 
-        // Destroy up to 4 highest fruits (smallest Y)
-        const sorted = [...this.fruits].filter((f) => f.active).sort((a, b) => a.y - b.y);
-        const toRemove = sorted.slice(0, 4);
-        for (const f of toRemove) {
-          this.spawnConfetti(f.x, f.y, 12);
-          this.fruits = this.fruits.filter((item) => item !== f);
-          f.destroy();
+        if (reason === 'out_of_moves') {
+          this.movesLeft += 6;
+          this.updateMissionPill();
+        } else {
+          // Destroy up to 4 highest fruits (smallest Y)
+          const sorted = [...this.fruits].filter((f) => f.active).sort((a, b) => a.y - b.y);
+          const toRemove = sorted.slice(0, 4);
+          for (const f of toRemove) {
+            this.spawnConfetti(f.x, f.y, 12);
+            this.fruits = this.fruits.filter((item) => item !== f);
+            f.destroy();
+          }
         }
 
         // Clear Game Over UI and resume
@@ -1485,7 +1775,7 @@ export default class GameScene extends Phaser.Scene {
     this.matter.world.pause();
 
     const overlay = this.add
-      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.75)
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.78)
       .setDepth(30)
       .setInteractive();
 
@@ -1497,30 +1787,17 @@ export default class GameScene extends Phaser.Scene {
 
     const cardBg = this.add.graphics();
     cardBg.fillStyle(0x1b1e3f, 1);
-    cardBg.fillRoundedRect(-170, -185, 340, 370, 24);
-    cardBg.lineStyle(2.5, 0x8ecae6, 0.7);
-    cardBg.strokeRoundedRect(-170, -185, 340, 370, 24);
+    cardBg.fillRoundedRect(-175, -245, 350, 490, 24);
+    cardBg.lineStyle(2.5, 0x8ecae6, 0.75);
+    cardBg.strokeRoundedRect(-175, -245, 350, 490, 24);
 
     const title = this.add
-      .text(0, -145, 'RÉGLAGES', {
-        fontSize: '24px',
-        fontStyle: '900',
+      .text(0, -206, t('settingsTitle'), {
+        fontFamily: FONT_FAMILY,
+        fontSize: '22px',
+        fontStyle: 'bold',
         color: '#ffffff',
       })
-      .setOrigin(0.5);
-
-    const maxFruitName = FRUITS[storageManager.getMaxTierReached()]?.name || 'Cerise';
-    const statsText = this.add
-      .text(
-        0,
-        -98,
-        `Parties : ${storageManager.getGamesPlayed()}   •   Fruit max : ${maxFruitName}`,
-        {
-          fontSize: '13px',
-          fontStyle: 'bold',
-          color: '#ffd166',
-        }
-      )
       .setOrigin(0.5);
 
     const closeModal = () => {
@@ -1531,43 +1808,82 @@ export default class GameScene extends Phaser.Scene {
       this.matter.world.resume();
     };
 
+    // 1. Game Mode Switcher (Levels vs Endless)
+    const isLevels = storageManager.getGameMode() === 'levels';
+    const modeBtn = this.makeModalButton(
+      0,
+      -140,
+      `${t('modeSwitchTitle')} : ${isLevels ? t('modeLevels') : t('modeEndless')}`,
+      0xff9f1c,
+      '#0b132b',
+      () => {
+        const nextMode = storageManager.getGameMode() === 'levels' ? 'endless' : 'levels';
+        storageManager.setGameMode(nextMode);
+        closeModal();
+        this.scene.restart();
+      }
+    );
+
+    // 2. Sound Toggle
     const soundBtn = this.makeModalButton(
       0,
-      -40,
-      soundFX.muted ? '🔇  SON : COUPÉ' : '🔊  SON : ACTIVÉ',
+      -78,
+      `${t('soundLabel')} : ${soundFX.muted ? t('off') : t('on')}`,
       0x3a0ca3,
       '#ffffff',
       () => {
         const muted = soundFX.toggleMute();
         this.muteBtn.setText(muted ? '🔇' : '🔊');
-        const labelObj = soundBtn.getAt(1);
-        labelObj.setText(muted ? '🔇  SON : COUPÉ' : '🔊  SON : ACTIVÉ');
+        soundBtn.getAt(1).setText(`${t('soundLabel')} : ${muted ? t('off') : t('on')}`);
       }
     );
 
-    const restartBtn = this.makeModalButton(0, 22, '↻  RECOMMENCER', 0xff9f1c, '#0b132b', () => {
-      closeModal();
-      this.scene.restart();
-    });
-
-    const privacyBtn = this.makeModalButton(
+    // 3. Haptics / Vibration Toggle
+    const hapticsBtn = this.makeModalButton(
       0,
-      84,
-      '🔒  VIE PRIVÉE (RGPD)',
-      0x2b2d42,
+      -16,
+      `${t('hapticsLabel')} : ${storageManager.isHapticsEnabled() ? t('on') : t('off')}`,
+      0x4361ee,
       '#ffffff',
       () => {
-        if (!adManager.isNative()) {
-          this.showToast('🔒 Disponible sur Android');
-          return;
-        }
-        adManager.showPrivacyOptions();
+        const next = !storageManager.isHapticsEnabled();
+        storageManager.setHapticsEnabled(next);
+        haptics.setEnabled(next);
+        if (next) haptics.drop();
+        hapticsBtn.getAt(1).setText(`${t('hapticsLabel')} : ${next ? t('on') : t('off')}`);
       }
     );
 
-    const resumeBtn = this.makeModalButton(0, 146, '▶  REPRENDRE', 0x06d6a0, '#0b132b', closeModal);
+    // 4. Language Cycler (FR -> EN -> DE -> JA -> AR)
+    const curLangObj = SUPPORTED_LANGS.find((l) => l.code === storageManager.getLang()) || SUPPORTED_LANGS[0];
+    const langBtn = this.makeModalButton(
+      0,
+      46,
+      `${t('langLabel')} : ${curLangObj.label}`,
+      0x7209b7,
+      '#ffffff',
+      () => {
+        const idx = SUPPORTED_LANGS.findIndex((l) => l.code === storageManager.getLang());
+        const nextLang = SUPPORTED_LANGS[(idx + 1) % SUPPORTED_LANGS.length];
+        storageManager.setLang(nextLang.code);
+        closeModal();
+        this.scene.restart();
+      }
+    );
 
-    card.add([cardBg, title, statsText, soundBtn, restartBtn, privacyBtn, resumeBtn]);
+    // 5. Privacy (RGPD)
+    const privacyBtn = this.makeModalButton(0, 108, '🔒  RGPD / PRIVACY', 0x2b2d42, '#ffffff', () => {
+      if (!adManager.isNative()) {
+        this.showToast('🔒 Android only');
+        return;
+      }
+      adManager.showPrivacyOptions();
+    });
+
+    // 6. Close / Resume
+    const resumeBtn = this.makeModalButton(0, 174, `▶  ${t('close')}`, 0x06d6a0, '#0b132b', closeModal);
+
+    card.add([cardBg, title, modeBtn, soundBtn, hapticsBtn, langBtn, privacyBtn, resumeBtn]);
 
     this.tweens.add({
       targets: card,
@@ -1581,6 +1897,7 @@ export default class GameScene extends Phaser.Scene {
   showToast(message) {
     const toast = this.add
       .text(GAME_WIDTH / 2, JAR_BOTTOM - 40, message, {
+        fontFamily: FONT_FAMILY,
         fontSize: '13px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -1609,41 +1926,6 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  showDailyBanner() {
-    const banner = this.add
-      .text(GAME_WIDTH / 2, JAR_TOP + 86, '🏆 DÉFI DU JOUR RÉUSSI !', {
-        fontSize: '15px',
-        fontStyle: '900',
-        color: '#0b132b',
-        backgroundColor: '#ffd166',
-        padding: { x: 14, y: 7 },
-      })
-      .setOrigin(0.5)
-      .setDepth(17)
-      .setScale(0.6)
-      .setAlpha(0);
-
-    this.spawnConfetti(GAME_WIDTH / 2, JAR_TOP + 90, 26);
-    this.tweens.add({
-      targets: banner,
-      scale: 1,
-      alpha: 1,
-      duration: 220,
-      ease: 'Back.easeOut',
-      onComplete: () => {
-        this.time.delayedCall(1600, () => {
-          this.tweens.add({
-            targets: banner,
-            y: banner.y - 24,
-            alpha: 0,
-            duration: 280,
-            onComplete: () => banner.destroy(),
-          });
-        });
-      },
-    });
-  }
-
   openRetentionModal() {
     if (this.settingsOpen || this.isGameOver) return;
     this.settingsOpen = true;
@@ -1663,27 +1945,28 @@ export default class GameScene extends Phaser.Scene {
 
     const cardBg = this.add.graphics();
     cardBg.fillStyle(0x1b1e3f, 1);
-    cardBg.fillRoundedRect(-190, -255, 380, 510, 26);
+    cardBg.fillRoundedRect(-192, -268, 384, 536, 26);
     cardBg.lineStyle(3, 0xffd166, 0.85);
-    cardBg.strokeRoundedRect(-190, -255, 380, 510, 26);
+    cardBg.strokeRoundedRect(-192, -268, 384, 536, 26);
 
-    // 2 Spacious Tabs at the top
-    let activeTab = 'daily';
-    const dailyGroup = this.add.container(0, 0);
+    // 3 Spacious Tabs at the top
+    let activeTab = 'quests';
+    const questsGroup = this.add.container(0, 0);
+    const leagueGroup = this.add.container(0, 0).setVisible(false);
     const themesGroup = this.add.container(0, 0).setVisible(false);
 
     const makeTab = (x, labelText, tabKey) => {
-      const tCont = this.add.container(x, -208);
+      const tCont = this.add.container(x, -222);
       const bg = this.add.graphics();
       const txt = this.add
         .text(0, 0, labelText, {
           fontFamily: FONT_FAMILY,
-          fontSize: '14px',
+          fontSize: '12px',
           fontStyle: 'bold',
           color: '#ffffff',
         })
         .setOrigin(0.5);
-      const zone = this.add.zone(0, 0, 162, 40).setInteractive({ useHandCursor: true });
+      const zone = this.add.zone(0, 0, 114, 38).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', (pointer) => {
         pointer.event?.stopPropagation?.();
         soundFX.playClick();
@@ -1694,82 +1977,162 @@ export default class GameScene extends Phaser.Scene {
       return { tCont, bg, txt, tabKey };
     };
 
-    const tab1 = makeTab(-86, '🎯 DÉFIS & FRUITS', 'daily');
-    const tab2 = makeTab(86, '🎨 THÈMES', 'themes');
+    const tab1 = makeTab(-118, t('tabQuests'), 'quests');
+    const tab2 = makeTab(0, t('tabLeague'), 'league');
+    const tab3 = makeTab(118, t('tabThemes'), 'themes');
 
     const refreshTabs = () => {
-      [tab1, tab2].forEach(({ bg, txt, tabKey }) => {
+      [tab1, tab2, tab3].forEach(({ bg, txt, tabKey }) => {
         const isOn = activeTab === tabKey;
         bg.clear();
         bg.fillStyle(isOn ? 0xff9f1c : 0x262b59, 1);
-        bg.fillRoundedRect(-81, -20, 162, 40, 20);
+        bg.fillRoundedRect(-56, -19, 112, 38, 19);
         bg.lineStyle(2, isOn ? 0xfff3b0 : 0x4a528a, isOn ? 1 : 0.6);
-        bg.strokeRoundedRect(-81, -20, 162, 40, 20);
+        bg.strokeRoundedRect(-56, -19, 112, 38, 19);
         txt.setColor(isOn ? '#0b132b' : '#cbd5ff');
       });
-      dailyGroup.setVisible(activeTab === 'daily');
+      questsGroup.setVisible(activeTab === 'quests');
+      leagueGroup.setVisible(activeTab === 'league');
       themesGroup.setVisible(activeTab === 'themes');
     };
     refreshTabs();
 
-    // --- TAB 1: DAILY CHALLENGE + FRUIT COLLECTION ---
-    const daily = storageManager.getDailyChallenge();
-    const dailyBox = this.add.graphics();
-    dailyBox.fillStyle(0x262b59, 1);
-    dailyBox.fillRoundedRect(-164, -162, 328, 122, 18);
-    dailyBox.lineStyle(2, daily.completed ? 0x06d6a0 : 0x9bf6ff, 0.75);
-    dailyBox.strokeRoundedRect(-164, -162, 328, 122, 18);
+    // --- TAB 1: CLAIMABLE QUESTS ---
+    const buildQuests = () => {
+      questsGroup.removeAll(true);
+      const quests = storageManager.getQuests();
+      quests.forEach((q, idx) => {
+        const qy = -152 + idx * 66;
+        const rowBg = this.add.graphics();
+        rowBg.fillStyle(q.claimed ? 0x171933 : 0x262b59, 1);
+        rowBg.fillRoundedRect(-170, qy - 26, 340, 56, 14);
+        rowBg.lineStyle(1.8, q.completed && !q.claimed ? 0x06d6a0 : 0x4a528a, 0.8);
+        rowBg.strokeRoundedRect(-170, qy - 26, 340, 56, 14);
 
-    const dailyHdr = this.add.text(-144, -146, `DÉFI DU JOUR   •   🔥 ${daily.streak} j`, {
-      fontFamily: FONT_FAMILY,
-      fontSize: '14px',
-      fontStyle: 'bold',
-      color: '#ffd166',
-    });
-    const dailyDesc = this.add.text(-144, -118, daily.title, {
-      fontFamily: FONT_FAMILY,
-      fontSize: '17px',
-      fontStyle: 'bold',
-      color: '#ffffff',
-      wordWrap: { width: 292 },
-    });
-    const dailyStatus = this.add.text(
-      -144,
-      -68,
-      daily.completed ? '✅ TERMINÉ AUJOURD’HUI !' : '⏳ En cours — joue pour le valider',
-      {
-        fontFamily: FONT_FAMILY,
-        fontSize: '14px',
-        fontStyle: 'bold',
-        color: daily.completed ? '#06d6a0' : '#a5b4fc',
-      }
-    );
+        const qTitle = this.add.text(-156, qy - 16, q.title, {
+          fontFamily: FONT_FAMILY,
+          fontSize: '13px',
+          fontStyle: 'bold',
+          color: q.claimed ? '#8d99ae' : '#ffffff',
+        });
 
-    const maxTier = storageManager.getMaxTierReached();
-    const colTitle = this.add
-      .text(0, -14, `COLLECTION (${Math.min(maxTier + 1, FRUITS.length)} / ${FRUITS.length} FRUITS)`, {
+        const rewardStr = `+${q.rewardXp} XP${q.rewardToken ? '  +1 🎁' : ''}`;
+        const qProg = this.add.text(-156, qy + 6, `${q.progress}/${q.target}  •  ${rewardStr}`, {
+          fontFamily: FONT_FAMILY,
+          fontSize: '11px',
+          fontStyle: 'bold',
+          color: '#ffd166',
+        });
+
+        questsGroup.add([rowBg, qTitle, qProg]);
+
+        if (q.completed && !q.claimed) {
+          const btnBg = this.add.graphics();
+          btnBg.fillStyle(0x06d6a0, 1);
+          btnBg.fillRoundedRect(76, qy - 16, 84, 32, 16);
+          const btnTxt = this.add
+            .text(118, qy, t('claim'), {
+              fontFamily: FONT_FAMILY,
+              fontSize: '12px',
+              fontStyle: 'bold',
+              color: '#0b132b',
+            })
+            .setOrigin(0.5);
+          const zone = this.add.zone(118, qy, 84, 34).setInteractive({ useHandCursor: true });
+          zone.on('pointerdown', (pointer) => {
+            pointer.event?.stopPropagation?.();
+            soundFX.playLevelWin();
+            haptics.levelWin();
+            storageManager.claimQuest(q.id);
+            this.spawnConfetti(GAME_WIDTH / 2, GAME_HEIGHT / 2, 24);
+            this.refreshQuestBadge();
+            this.refreshBoosterLabels();
+            buildQuests();
+          });
+          questsGroup.add([btnBg, btnTxt, zone]);
+        } else {
+          const stTxt = this.add
+            .text(154, qy, q.claimed ? t('claimed') : t('inProgress'), {
+              fontFamily: FONT_FAMILY,
+              fontSize: '11px',
+              fontStyle: 'bold',
+              color: q.claimed ? '#06d6a0' : '#9bf6ff',
+            })
+            .setOrigin(1, 0.5);
+          questsGroup.add(stTxt);
+        }
+      });
+    };
+    buildQuests();
+
+    // --- TAB 2: WEEKLY LEAGUE RANKING ---
+    const seasonPts = storageManager.getSeasonPoints();
+    const { current: curLeague, next: nextLeague } = getLeagueForPoints(seasonPts);
+    const board = buildWeeklyLeaderboard(seasonPts);
+    const playerRow = board.find((r) => r.isPlayer) || { rank: 1 };
+
+    const leagueHdrBg = this.add.graphics();
+    leagueHdrBg.fillStyle(0x262b59, 1);
+    leagueHdrBg.fillRoundedRect(-170, -182, 340, 62, 16);
+    leagueHdrBg.lineStyle(2, 0xffd166, 0.75);
+    leagueHdrBg.strokeRoundedRect(-170, -182, 340, 62, 16);
+
+    const leagueTitle = this.add
+      .text(0, -162, `${curLeague.icon}  ${t('leagueTitle', { name: curLeague.name })}`, {
         fontFamily: FONT_FAMILY,
-        fontSize: '15px',
+        fontSize: '18px',
         fontStyle: 'bold',
-        color: '#9bf6ff',
+        color: curLeague.color,
       })
       .setOrigin(0.5);
 
-    const colItems = [];
-    FRUITS.forEach((f, idx) => {
-      const col = idx % 6;
-      const row = Math.floor(idx / 6);
-      const cx = (row === 0 ? -135 : -108) + col * 54;
-      const cy = 36 + row * 62;
-      const unlocked = idx <= maxTier;
-      const slot = this.add.circle(cx, cy, 22, unlocked ? 0xffffff : 0x0b0824, unlocked ? 0.12 : 0.45);
-      const icon = this.add.image(cx, cy, `fruit_${f.tier}`).setDisplaySize(38, 38).setAlpha(unlocked ? 1 : 0.25);
-      colItems.push(slot, icon);
+    const leagueSub = this.add
+      .text(
+        0,
+        -136,
+        `${t('yourRank', { rank: playerRow.rank })}  •  ${seasonPts} pts${
+          nextLeague ? `  (➜ ${nextLeague.icon} ${nextLeague.minPts})` : ''
+        }`,
+        {
+          fontFamily: FONT_FAMILY,
+          fontSize: '12px',
+          fontStyle: 'bold',
+          color: '#cbd5ff',
+        }
+      )
+      .setOrigin(0.5);
+
+    leagueGroup.add([leagueHdrBg, leagueTitle, leagueSub]);
+
+    board.forEach((row, idx) => {
+      const ry = -96 + idx * 34;
+      const rBg = this.add.graphics();
+      rBg.fillStyle(row.isPlayer ? 0x3a0ca3 : 0x20244a, row.isPlayer ? 1 : 0.85);
+      rBg.fillRoundedRect(-170, ry - 14, 340, 28, 10);
+      if (row.isPlayer) {
+        rBg.lineStyle(1.5, 0x06d6a0, 1);
+        rBg.strokeRoundedRect(-170, ry - 14, 340, 28, 10);
+      }
+      const rTxt = this.add
+        .text(-156, ry, `#${row.rank}   ${row.name}`, {
+          fontFamily: FONT_FAMILY,
+          fontSize: '13px',
+          fontStyle: 'bold',
+          color: row.isPlayer ? '#06d6a0' : '#ffffff',
+        })
+        .setOrigin(0, 0.5);
+      const pTxt = this.add
+        .text(156, ry, `${row.pts} pts`, {
+          fontFamily: FONT_FAMILY,
+          fontSize: '13px',
+          fontStyle: 'bold',
+          color: '#ffd166',
+        })
+        .setOrigin(1, 0.5);
+      leagueGroup.add([rBg, rTxt, pTxt]);
     });
 
-    dailyGroup.add([dailyBox, dailyHdr, dailyDesc, dailyStatus, colTitle, ...colItems]);
-
-    // --- TAB 2: VISUAL THEMES (4 large full-width cards) ---
+    // --- TAB 3: VISUAL THEMES ---
     const themeObjs = [];
     const saveData = storageManager.data;
 
@@ -1780,42 +2143,42 @@ export default class GameScene extends Phaser.Scene {
         const selected = theme.id === currentId;
         bg.clear();
         bg.fillStyle(selected ? 0x3a0ca3 : unlocked ? 0x262b59 : 0x171933, 1);
-        bg.fillRoundedRect(-164, -34, 328, 68, 16);
+        bg.fillRoundedRect(-168, -32, 336, 64, 16);
         bg.lineStyle(2.5, selected ? 0x39e5b6 : unlocked ? 0x8ecae6 : 0x4a4e69, selected ? 1 : 0.55);
-        bg.strokeRoundedRect(-164, -34, 328, 68, 16);
+        bg.strokeRoundedRect(-168, -32, 336, 64, 16);
 
         titleTxt.setText(`${theme.icon}  ${theme.name}`);
-        subTxt.setText(selected ? '✓ THÈME ACTIF' : unlocked ? 'Toucher pour activer' : `🔒 ${theme.unlockDesc}`);
+        subTxt.setText(selected ? '✓ ACTIF' : unlocked ? 'Tap' : `🔒 ${theme.unlockDesc}`);
         subTxt.setColor(selected ? '#39e5b6' : unlocked ? '#cbd5ff' : '#ffd166');
       });
     };
 
     THEMES.forEach((theme, idx) => {
-      const ty = -126 + idx * 82;
+      const ty = -142 + idx * 78;
       const tContainer = this.add.container(0, ty);
       const bg = this.add.graphics();
       const titleTxt = this.add
-        .text(-144, -14, '', {
+        .text(-148, -12, '', {
           fontFamily: FONT_FAMILY,
-          fontSize: '17px',
+          fontSize: '16px',
           fontStyle: 'bold',
           color: '#ffffff',
         })
         .setOrigin(0, 0.5);
       const subTxt = this.add
-        .text(-144, 14, '', {
+        .text(-148, 12, '', {
           fontFamily: FONT_FAMILY,
-          fontSize: '13px',
+          fontSize: '12px',
           fontStyle: 'bold',
           color: '#cbd5ff',
         })
         .setOrigin(0, 0.5);
-      const zone = this.add.zone(0, 0, 328, 68).setInteractive({ useHandCursor: true });
+      const zone = this.add.zone(0, 0, 336, 64).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', (pointer) => {
         pointer.event?.stopPropagation?.();
         soundFX.playClick();
         if (!theme.isUnlocked(saveData)) {
-          this.showToast(`🔒 Déblocage : ${theme.unlockDesc}`);
+          this.showToast(`🔒 ${theme.unlockDesc}`);
           return;
         }
         storageManager.setSelectedTheme(theme.id);
@@ -1837,9 +2200,9 @@ export default class GameScene extends Phaser.Scene {
       this.matter.world.resume();
     };
 
-    const closeBtn = this.makeModalButton(0, 204, '▶  REPRENDRE', 0x06d6a0, '#0b132b', closeModal);
+    const closeBtn = this.makeModalButton(0, 218, `▶  ${t('close')}`, 0x06d6a0, '#0b132b', closeModal);
 
-    card.add([cardBg, tab1.tCont, tab2.tCont, dailyGroup, themesGroup, closeBtn]);
+    card.add([cardBg, tab1.tCont, tab2.tCont, tab3.tCont, questsGroup, leagueGroup, themesGroup, closeBtn]);
 
     this.tweens.add({
       targets: card,
