@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Juicy Drop — Play Store Assets Preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 32px 24px 64px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0b0726; color: #eef1ff;
+    }
+    h1 { margin: 0 0 8px; color: #39e5b6; }
+    p.lead { color: #b3bad8; margin: 0 0 28px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+    }
+    .card {
+      background: #151935;
+      border: 1px solid #2b3260;
+      border-radius: 16px;
+      padding: 18px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .card.wide { grid-column: 1 / -1; }
+    .card h2 { margin: 0; font-size: 1.05rem; color: #ffd166; }
+    .meta { font-size: 0.85rem; color: #a7b1d8; }
+    .img-wrap {
+      position: relative;
+      background: #09061d;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #252b54;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .img-wrap img { max-width: 100%; height: auto; display: block; }
+    .safe-zone {
+      position: absolute;
+      left: 9.76%; right: 9.76%; top: 12%; bottom: 12%;
+      border: 2px dashed #39e5b6;
+      pointer-events: none;
+      display: none;
+    }
+    .safe-zone.show { display: block; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    a.btn, button.btn {
+      display: inline-block;
+      padding: 9px 16px;
+      border-radius: 10px;
+      background: #39e5b6;
+      color: #09131c;
+      font-weight: 700;
+      font-size: 0.9rem;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+    button.btn.sec { background: #2a315c; color: #eef1ff; }
+  </style>
+</head>
+<body>
+  <h1>Juicy Drop — Google Play Store Assets</h1>
+  <p class="lead">Tous les visuels exportés aux dimensions exactes Google Play dans <code>/store_assets</code>.</p>
+
+  <div class="grid">
+    <div class="card wide">
+      <h2>Bannière de présentation (Feature Graphic) — 1024 × 500 px</h2>
+      <div class="meta">PNG • Zone de sécurité centrale (marge 100 px H / 60 px V)</div>
+      <div class="img-wrap">
+        <img src="./feature-graphic-1024x500.png" alt="Feature Graphic 1024x500" />
+        <div id="safeZone" class="safe-zone"></div>
+      </div>
+      <div class="actions">
+        <a class="btn" href="./feature-graphic-1024x500.png" download="juicy-drop-feature-1024x500.png">Télécharger PNG</a>
+        <button class="btn sec" onclick="document.getElementById('safeZone').classList.toggle('show')">Afficher / Masquer zone de sécurité</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Icône d'application — 512 × 512 px</h2>
+      <div class="meta">PNG 32 bits • &lt; 1 Mo</div>
+      <div class="img-wrap"><img src="./icon-512.png" alt="Icon 512x512" style="max-width:256px;" /></div>
+      <div class="actions"><a class="btn" href="./icon-512.png" download="juicy-drop-icon-512.png">Télécharger PNG</a></div>
+    </div>
+
+    <div class="card">
+      <h2>Mockup Téléphone #1 — Fusionnez les fruits</h2>
+      <div class="meta">1080 × 1920 px (9:16)</div>
+      <div class="img-wrap"><img src="./mockup-1-merge.png" alt="Mockup 1" /></div>
+      <div class="actions"><a class="btn" href="./mockup-1-merge.png" download="mockup-1-merge.png">Télécharger PNG</a></div>
+    </div>
+
+    <div class="card">
+      <h2>Mockup Téléphone #2 — Combos & Pastèque</h2>
+      <div class="meta">1080 × 1920 px (9:16)</div>
+      <div class="img-wrap"><img src="./mockup-2-combos.png" alt="Mockup 2" /></div>
+      <div class="actions"><a class="btn" href="./mockup-2-combos.png" download="mockup-2-combos.png">Télécharger PNG</a></div>
+    </div>
+
+    <div class="card">
+      <h2>Mockup Téléphone #3 — Boosters & Seconde chance</h2>
+      <div class="meta">1080 × 1920 px (9:16)</div>
+      <div class="img-wrap"><img src="./mockup-3-boosters.png" alt="Mockup 3" /></div>
+      <div class="actions"><a class="btn" href="./mockup-3-boosters.png" download="mockup-3-boosters.png">Télécharger PNG</a></div>
+    </div>
+
+    <div class="card">
+      <h2>Capture Tablette 7" — 1200 × 1920 px</h2>
+      <div class="meta">PNG • Format Tablette 7"</div>
+      <div class="img-wrap"><img src="./tablet-7-1200x1920.png" alt="Tablet 7" /></div>
+      <div class="actions"><a class="btn" href="./tablet-7-1200x1920.png" download="tablet-7-1200x1920.png">Télécharger PNG</a></div>
+    </div>
+
+    <div class="card">
+      <h2>Capture Tablette 10" — 1600 × 2560 px</h2>
+      <div class="meta">PNG • Format Tablette 10"</div>
+      <div class="img-wrap"><img src="./tablet-10-1600x2560.png" alt="Tablet 10" /></div>
+      <div class="actions"><a class="btn" href="./tablet-10-1600x2560.png" download="tablet-10-1600x2560.png">Télécharger PNG</a></div>
+    </div>
+  </div>
+</body>
+</html>
