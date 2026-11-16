@@ -495,41 +495,213 @@ export default class GameScene extends Phaser.Scene {
     this.missionText.setText(`♾️ ${t('endless')} · 🎯 ${label} (+${m.reward})`);
   }
 
+  ensureBoosterTextures() {
+    if (!this.textures.exists('booster_shake')) {
+      const tex = this.textures.createCanvas('booster_shake', 140, 140);
+      const ctx = tex.getContext();
+      ctx.clearRect(0, 0, 140, 140);
+
+      // Soft aura glow
+      const glow = ctx.createRadialGradient(70, 70, 10, 70, 70, 62);
+      glow.addColorStop(0, 'rgba(128, 255, 219, 0.55)');
+      glow.addColorStop(1, 'rgba(128, 255, 219, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(70, 70, 62, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dynamic shake motion arcs (left & right)
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(70, 70, 52, Math.PI * 0.78, Math.PI * 1.18);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(70, 70, 52, -Math.PI * 0.22, Math.PI * 0.18);
+      ctx.stroke();
+
+      // Cartoon whirlwind / swirl funnel (thick outline + bright gradient)
+      const drawSwirlRibbon = (y, rx, ry, fillTop, fillBot) => {
+        const grad = ctx.createLinearGradient(70 - rx, y - ry, 70 + rx, y + ry);
+        grad.addColorStop(0, fillTop);
+        grad.addColorStop(1, fillBot);
+        ctx.fillStyle = grad;
+        ctx.strokeStyle = '#240046';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.ellipse(70, y, rx, ry, -0.08, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Glossy highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.beginPath();
+        ctx.ellipse(70 - rx * 0.22, y - ry * 0.28, rx * 0.48, ry * 0.26, -0.08, 0, Math.PI * 2);
+        ctx.fill();
+      };
+
+      drawSwirlRibbon(102, 16, 7, '#80ffdb', '#4ea8de');
+      drawSwirlRibbon(82, 27, 10, '#a0f0ff', '#5e60ce');
+      drawSwirlRibbon(58, 38, 12, '#e0fbfc', '#48bfe3');
+      drawSwirlRibbon(36, 44, 13, '#ffffff', '#80ffdb');
+
+      // Cute 4-point sparkles
+      const drawSpark = (cx, cy, r, color) => {
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#240046';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const rad = i % 2 === 0 ? r : r * 0.36;
+          const a = (i * Math.PI) / 4;
+          const px = cx + Math.cos(a) * rad;
+          const py = cy + Math.sin(a) * rad;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      };
+      drawSpark(28, 34, 11, '#ffd166');
+      drawSpark(114, 96, 10, '#ffd166');
+      tex.refresh();
+    }
+
+    if (!this.textures.exists('booster_pin')) {
+      const tex = this.textures.createCanvas('booster_pin', 140, 140);
+      const ctx = tex.getContext();
+      ctx.clearRect(0, 0, 140, 140);
+
+      // Soft warm glow
+      const glow = ctx.createRadialGradient(70, 70, 10, 70, 70, 62);
+      glow.addColorStop(0, 'rgba(255, 209, 102, 0.55)');
+      glow.addColorStop(1, 'rgba(255, 59, 92, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(70, 70, 62, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Starburst pop at tip (bottom-left)
+      ctx.fillStyle = '#ffd166';
+      ctx.strokeStyle = '#3d0814';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      for (let i = 0; i < 12; i++) {
+        const rad = i % 2 === 0 ? 24 : 11;
+        const a = (i * Math.PI) / 6;
+        const px = 42 + Math.cos(a) * rad;
+        const py = 98 + Math.sin(a) * rad;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Tilted cartoon dart / magic popper
+      ctx.save();
+      ctx.translate(74, 66);
+      ctx.rotate(-Math.PI / 4);
+
+      // Silver tip
+      ctx.fillStyle = '#edf2f4';
+      ctx.strokeStyle = '#2b2d42';
+      ctx.lineWidth = 4.5;
+      ctx.beginPath();
+      ctx.moveTo(-42, 0);
+      ctx.lineTo(-16, -9);
+      ctx.lineTo(-16, 9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Gold collar ring
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath();
+      ctx.roundRect(-18, -11, 10, 22, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // Juicy ruby candy body
+      const bodyGrad = ctx.createLinearGradient(0, -16, 0, 16);
+      bodyGrad.addColorStop(0, '#ff8fab');
+      bodyGrad.addColorStop(0.5, '#ff3b5c');
+      bodyGrad.addColorStop(1, '#b5173c');
+      ctx.fillStyle = bodyGrad;
+      ctx.beginPath();
+      ctx.roundRect(-8, -14, 34, 28, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      // Glossy body highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.ellipse(9, -6, 12, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Feathered fins (gold/aqua)
+      ctx.fillStyle = '#48bfe3';
+      ctx.beginPath();
+      ctx.moveTo(24, -10);
+      ctx.lineTo(44, -22);
+      ctx.lineTo(38, 0);
+      ctx.lineTo(44, 22);
+      ctx.lineTo(24, 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.restore();
+      tex.refresh();
+    }
+  }
+
   createBoosterButtons() {
-    const makeIconTile = (x, y, emoji, fillColor, lipColor, onClick) => {
+    this.ensureBoosterTextures();
+
+    const makeIconTile = (x, y, textureKey, fillColor, lipColor, onClick) => {
       const container = this.add.container(x, y).setDepth(12);
       const w = 68;
-      const h = 64;
+      const h = 62;
       const bg = this.add.graphics();
+      // Drop shadow
+      bg.fillStyle(0x000000, 0.35);
+      bg.fillRoundedRect(-w / 2, -h / 2 + 6, w, h, 20);
       // 3D bottom lip
       bg.fillStyle(lipColor, 1);
-      bg.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 18);
-      // Main tile body
+      bg.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 20);
+      // Main candy tile body
       bg.fillStyle(fillColor, 1);
-      bg.fillRoundedRect(-w / 2, -h / 2, w, h, 18);
-      // Glossy top highlight
-      bg.fillStyle(0xffffff, 0.22);
-      bg.fillRoundedRect(-w / 2 + 7, -h / 2 + 3, w - 14, 14, 7);
-      // Crisp border
-      bg.lineStyle(2, 0xffffff, 0.5);
-      bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 18);
+      bg.fillRoundedRect(-w / 2, -h / 2, w, h, 20);
+      // Glossy top cushion highlight
+      bg.fillStyle(0xffffff, 0.28);
+      bg.fillRoundedRect(-w / 2 + 7, -h / 2 + 3, w - 14, 16, 8);
+      // Crisp cream-white border
+      bg.lineStyle(2.5, 0xffffff, 0.85);
+      bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 20);
 
-      const iconTxt = this.add.text(0, -8, emoji, { fontSize: '26px' }).setOrigin(0.5);
+      const iconImg = this.add.image(0, -5, textureKey).setDisplaySize(48, 48);
 
+      // Overlapping bottom pill badge
+      const badgeGroup = this.add.container(0, 26);
       const badgeBg = this.add.graphics();
-      badgeBg.fillStyle(0x0b0824, 0.72);
-      badgeBg.fillRoundedRect(-26, 11, 52, 17, 8);
-
+      const videoIcon = this.add.graphics();
       const badgeTxt = this.add
-        .text(0, 19, '', {
+        .text(0, 0, '', {
           fontFamily: FONT_FAMILY,
-          fontSize: '10px',
+          fontSize: '11px',
           fontStyle: 'bold',
-          color: '#ffd166',
+          color: '#ffffff',
+          stroke: '#1b1e3f',
+          strokeThickness: 2.5,
         })
         .setOrigin(0.5);
 
-      const zone = this.add.zone(0, 0, w + 4, h + 4).setInteractive({ useHandCursor: true });
+      badgeGroup.add([badgeBg, videoIcon, badgeTxt]);
+
+      const zone = this.add.zone(0, 0, w + 6, h + 10).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', (pointer) => {
         pointer.event?.stopPropagation?.();
         soundFX.playClick();
@@ -537,32 +709,77 @@ export default class GameScene extends Phaser.Scene {
         onClick();
       });
 
-      container.add([bg, iconTxt, badgeBg, badgeTxt, zone]);
-      return { container, txt: badgeTxt };
+      container.add([bg, iconImg, badgeGroup, zone]);
+      return { container, badgeBg, videoIcon, txt: badgeTxt };
     };
 
-    const shakeObj = makeIconTile(236, 108, '🌪️', 0x7b2cbf, 0x3c096c, () => this.triggerShakeBooster());
-    const pinObj = makeIconTile(312, 108, '📌', 0xff3b5c, 0xa4133c, () => this.triggerPinBooster());
+    const shakeObj = makeIconTile(236, 106, 'booster_shake', 0x7209b7, 0x3c096c, () => this.triggerShakeBooster());
+    const pinObj = makeIconTile(312, 106, 'booster_pin', 0xf72585, 0x9e0059, () => this.triggerPinBooster());
     this.shakeContainer = shakeObj.container;
     this.pinContainer = pinObj.container;
-    this.shakeBtnTxt = shakeObj.txt;
-    this.pinBtnTxt = pinObj.txt;
+    this.shakeBadge = shakeObj;
+    this.pinBadge = pinObj;
     this.shakeNudged = false;
     this.pinNudged = false;
     this.refreshBoosterLabels();
   }
 
+  drawBoosterBadge(badgeObj, { mode, tokens, nudgeText }) {
+    if (!badgeObj) return;
+    const { badgeBg, videoIcon, txt } = badgeObj;
+    badgeBg.clear();
+    videoIcon.clear();
+
+    const w = 56;
+    const h = 20;
+    let fill = 0xff9f1c;
+    if (mode === 'nudge') fill = 0x39e5b6;
+    else if (mode === 'token') fill = 0x06d6a0;
+
+    // Pill shadow + body + white border
+    badgeBg.fillStyle(0x000000, 0.35);
+    badgeBg.fillRoundedRect(-w / 2, -h / 2 + 2, w, h, 10);
+    badgeBg.fillStyle(fill, 1);
+    badgeBg.fillRoundedRect(-w / 2, -h / 2, w, h, 10);
+    badgeBg.lineStyle(2, 0xffffff, 0.95);
+    badgeBg.strokeRoundedRect(-w / 2, -h / 2, w, h, 10);
+
+    if (mode === 'nudge') {
+      txt.setX(0);
+      txt.setColor('#0b132b');
+      txt.setStroke('#ffffff', 0);
+      txt.setText(nudgeText);
+    } else if (mode === 'token') {
+      txt.setX(0);
+      txt.setColor('#ffffff');
+      txt.setStroke('#064e3b', 3);
+      txt.setText(`×${tokens}`);
+    } else {
+      // Draw mini video clapper/play icon on the left + localized AD/PUB label
+      videoIcon.fillStyle(0x1b1e3f, 0.9);
+      videoIcon.fillRoundedRect(-21, -6, 15, 12, 3);
+      videoIcon.fillStyle(0xffffff, 1);
+      videoIcon.fillTriangle(-16, -3.5, -16, 3.5, -9.5, 0);
+
+      txt.setX(10);
+      txt.setColor('#ffffff');
+      txt.setStroke('#7c2d12', 3);
+      txt.setText(t('adBadge'));
+    }
+  }
+
   refreshBoosterLabels() {
     const tokens = storageManager.getFreeTokens();
-    const baseBadge = tokens > 0 ? `🎁 ${tokens}` : '▶ AD';
-    if (this.shakeBtnTxt) {
-      this.shakeBtnTxt.setColor(this.shakeNudged ? '#80ffdb' : '#ffd166');
-      this.shakeBtnTxt.setText(this.shakeNudged ? '⚡ AUTO!' : baseBadge);
-    }
-    if (this.pinBtnTxt) {
-      this.pinBtnTxt.setColor(this.pinNudged ? '#80ffdb' : '#ffd166');
-      this.pinBtnTxt.setText(this.pinNudged ? '🆘 SOS!' : baseBadge);
-    }
+    this.drawBoosterBadge(this.shakeBadge, {
+      mode: this.shakeNudged ? 'nudge' : tokens > 0 ? 'token' : 'ad',
+      tokens,
+      nudgeText: '⚡ AUTO!',
+    });
+    this.drawBoosterBadge(this.pinBadge, {
+      mode: this.pinNudged ? 'nudge' : tokens > 0 ? 'token' : 'ad',
+      tokens,
+      nudgeText: '🆘 SOS!',
+    });
   }
 
   setBoosterNudge(which, active) {
