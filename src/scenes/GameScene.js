@@ -471,19 +471,74 @@ export default class GameScene extends Phaser.Scene {
 
     const shakeObj = makeArcadePill(274, 88, '🎬 SECOUER', 0x7b2cbf, 0x3c096c, () => this.triggerShakeBooster());
     const pinObj = makeArcadePill(274, 125, '🎬 ÉPINGLE', 0xff3b5c, 0xa4133c, () => this.triggerPinBooster());
+    this.shakeContainer = shakeObj.container;
+    this.pinContainer = pinObj.container;
     this.shakeBtnTxt = shakeObj.txt;
     this.pinBtnTxt = pinObj.txt;
+    this.shakeNudged = false;
+    this.pinNudged = false;
     this.refreshBoosterLabels();
   }
 
   refreshBoosterLabels() {
     const tokens = storageManager.getFreeTokens();
+    const prefix = tokens > 0 ? '🎁' : '🎬';
+    const suffix = tokens > 0 ? ` (${tokens})` : '';
     if (this.shakeBtnTxt) {
-      this.shakeBtnTxt.setText(tokens > 0 ? `🎁 SECOUER (${tokens})` : '🎬 SECOUER');
+      this.shakeBtnTxt.setText(
+        this.shakeNudged ? `${prefix} FUSION AUTO !` : `${prefix} SECOUER${suffix}`
+      );
     }
     if (this.pinBtnTxt) {
-      this.pinBtnTxt.setText(tokens > 0 ? `🎁 ÉPINGLE (${tokens})` : '🎬 ÉPINGLE');
+      this.pinBtnTxt.setText(
+        this.pinNudged ? `${prefix} SAUVE-TOI !` : `${prefix} ÉPINGLE${suffix}`
+      );
     }
+  }
+
+  setBoosterNudge(which, active) {
+    const isShake = which === 'shake';
+    const current = isShake ? this.shakeNudged : this.pinNudged;
+    if (current === active) return;
+
+    if (isShake) {
+      this.shakeNudged = active;
+      if (this.shakeNudgeTween) {
+        this.shakeNudgeTween.stop();
+        this.shakeNudgeTween = null;
+      }
+      if (active && this.shakeContainer) {
+        this.shakeNudgeTween = this.tweens.add({
+          targets: this.shakeContainer,
+          scale: 1.07,
+          duration: 380,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+      } else if (this.shakeContainer) {
+        this.shakeContainer.setScale(1);
+      }
+    } else {
+      this.pinNudged = active;
+      if (this.pinNudgeTween) {
+        this.pinNudgeTween.stop();
+        this.pinNudgeTween = null;
+      }
+      if (active && this.pinContainer) {
+        this.pinNudgeTween = this.tweens.add({
+          targets: this.pinContainer,
+          scale: 1.07,
+          duration: 320,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+      } else if (this.pinContainer) {
+        this.pinContainer.setScale(1);
+      }
+    }
+    this.refreshBoosterLabels();
   }
 
   createEvolutionBar() {
@@ -920,19 +975,29 @@ export default class GameScene extends Phaser.Scene {
 
     const now = this.time.now;
     let overflowing = false;
+    let highRisk = false;
+    let settledCount = 0;
 
     for (const fruit of this.fruits) {
       if (!fruit.active) continue;
       // Only check fruits that have been in play > 1.1s so newly dropped ones don't trigger immediately
       if (now - fruit.getData('spawnTime') < 1100) continue;
+      settledCount += 1;
 
       const tier = fruit.getData('tier');
       const r = FRUITS[tier].radius;
       if (fruit.y - r < DANGER_Y) {
         overflowing = true;
+        highRisk = true;
         break;
       }
+      if (fruit.y - r < DANGER_Y + 95) {
+        highRisk = true;
+      }
     }
+
+    this.setBoosterNudge('pin', highRisk);
+    this.setBoosterNudge('shake', !highRisk && settledCount >= 9 && now - this.lastMergeTime > 4500);
 
     if (overflowing) {
       this.dangerTimer += delta;
@@ -1000,6 +1065,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _executeShake() {
+    this.setBoosterNudge('shake', false);
     this.cameras.main.shake(280, 0.016);
     for (const fruit of this.fruits) {
       if (!fruit.active) continue;
@@ -1008,6 +1074,38 @@ export default class GameScene extends Phaser.Scene {
         Phaser.Math.FloatBetween(-9, -4)
       );
     }
+
+    // Magnetize the highest-tier matching pair toward each other to guarantee a juicy merge
+    let bestPair = null;
+    let bestTier = -1;
+    let bestDist = Infinity;
+    for (let i = 0; i < this.fruits.length; i += 1) {
+      const a = this.fruits[i];
+      if (!a.active) continue;
+      const tierA = a.getData('tier');
+      for (let j = i + 1; j < this.fruits.length; j += 1) {
+        const b = this.fruits[j];
+        if (!b.active) continue;
+        if (b.getData('tier') !== tierA) continue;
+        const d = Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
+        if (tierA > bestTier || (tierA === bestTier && d < bestDist)) {
+          bestTier = tierA;
+          bestDist = d;
+          bestPair = [a, b];
+        }
+      }
+    }
+
+    if (bestPair && bestDist > 1) {
+      const [a, b] = bestPair;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const pull = 10.5;
+      a.setVelocity((dx / len) * pull, (dy / len) * pull - 2);
+      b.setVelocity((-dx / len) * pull, (-dy / len) * pull - 2);
+    }
+
     this.spawnConfetti(GAME_WIDTH / 2, JAR_TOP + 60, 20);
   }
 
@@ -1075,10 +1173,45 @@ export default class GameScene extends Phaser.Scene {
     this.fruits = this.fruits.filter((f) => f !== target);
     target.destroy();
 
+    const bonus = 150;
+    this.score += bonus;
+    this.scoreText.setText(String(this.score));
+    this.tweens.add({
+      targets: this.scoreText,
+      scale: 1.24,
+      duration: 95,
+      yoyo: true,
+    });
+    if (storageManager.updateBestScore(this.score)) {
+      this.bestScore = this.score;
+      this.bestText.setText(`👑 ${this.bestScore}`);
+    }
+    this.checkRunMission({ score: this.score });
+
+    const floatTxt = this.add
+      .text(fx, fy - 10, `+${bonus} 📌`, {
+        fontSize: '21px',
+        fontStyle: '900',
+        color: '#ffd166',
+        stroke: '#0d0e22',
+        strokeThickness: 5,
+      })
+      .setOrigin(0.5)
+      .setDepth(12);
+    this.tweens.add({
+      targets: floatTxt,
+      y: fy - 58,
+      alpha: 0,
+      duration: 720,
+      ease: 'Cubic.easeOut',
+      onComplete: () => floatTxt.destroy(),
+    });
+
     soundFX.playMerge(tier, 1);
     this.cameras.main.shake(150, 0.01);
     this.spawnConfetti(fx, fy, 18);
 
+    this.setBoosterNudge('pin', false);
     this.pinMode = false;
     this.pinBanner.setVisible(false);
     this.canDrop = true;
