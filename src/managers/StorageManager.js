@@ -15,6 +15,7 @@ const DEFAULT_DATA = {
   level: 1,
   freeTokens: 1,
   lang: '',
+  langManual: false,
   hapticsEnabled: true,
   gameMode: 'levels',
   campaignLevel: 1,
@@ -44,7 +45,7 @@ const RANKS = [
 class StorageManager {
   constructor() {
     this.data = this.load();
-    const lang = this.data.lang || detectSystemLang();
+    const lang = this.data.langManual && this.data.lang ? this.data.lang : detectSystemLang();
     this.data.lang = lang;
     applyI18nLang(lang);
   }
@@ -84,8 +85,9 @@ class StorageManager {
     return this.data.lang || detectSystemLang() || 'en';
   }
 
-  setLang(lang) {
+  setLang(lang, manual = true) {
     this.data.lang = lang;
+    this.data.langManual = Boolean(manual);
     applyI18nLang(lang);
     this.save();
   }
