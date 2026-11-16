@@ -314,21 +314,52 @@ const DICT = {
     questDailyCombo: 'كومبو ×{target}+',
     questCareerGames: 'العب {target} جولات',
     questCareerLevel: 'صل للمستوى {target}',
+    activeTheme: '✓ نشط',
+    tapToUse: 'اضغط للتفعيل',
+    youLabel: 'أنت',
+    newFruitBanner: '🌟 فاكهة جديدة: {fruit}!',
   },
 };
 
+// Ensure all 5 languages have activeTheme, tapToUse, youLabel, newFruitBanner
+DICT.fr.activeTheme = '✓ ACTIF';
+DICT.fr.tapToUse = 'Toucher pour activer';
+DICT.fr.youLabel = 'TOI';
+DICT.fr.newFruitBanner = '🌟 NOUVEAU FRUIT : {fruit} !';
+
+DICT.en.activeTheme = '✓ ACTIVE';
+DICT.en.tapToUse = 'Tap to equip';
+DICT.en.youLabel = 'YOU';
+DICT.en.newFruitBanner = '🌟 NEW FRUIT: {fruit}!';
+
+DICT.de.activeTheme = '✓ AKTIV';
+DICT.de.tapToUse = 'Tippen zum Aktivieren';
+DICT.de.youLabel = 'DU';
+DICT.de.newFruitBanner = '🌟 NEUE FRUCHT: {fruit}!';
+
+DICT.ja.activeTheme = '✓ 使用中';
+DICT.ja.tapToUse = 'タップで変更';
+DICT.ja.youLabel = 'あなた';
+DICT.ja.newFruitBanner = '🌟 新フルーツ: {fruit}！';
+
 export function detectSystemLang() {
-  if (typeof navigator === 'undefined') return 'fr';
-  const raw = (navigator.language || 'fr').slice(0, 2).toLowerCase();
-  return DICT[raw] ? raw : 'en';
+  if (typeof navigator === 'undefined') return 'en';
+  const candidates = Array.isArray(navigator.languages) && navigator.languages.length > 0
+    ? navigator.languages
+    : [navigator.language || navigator.userLanguage || 'en'];
+
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const code = String(raw).split('-')[0].split('_')[0].toLowerCase();
+    if (DICT[code]) return code;
+  }
+  return 'en';
 }
 
 let currentLang = detectSystemLang();
 
 export function setLang(lang) {
-  if (DICT[lang]) {
-    currentLang = lang;
-  }
+  currentLang = DICT[lang] ? lang : 'en';
 }
 
 export function getLang() {

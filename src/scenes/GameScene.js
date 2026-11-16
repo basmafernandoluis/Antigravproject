@@ -1088,9 +1088,10 @@ export default class GameScene extends Phaser.Scene {
 
   showNewFruitBanner(fruit) {
     const banner = this.add
-      .text(GAME_WIDTH / 2, JAR_TOP + 45, `🌟 NOUVEAU FRUIT : ${fruit.name.toUpperCase()} !`, {
+      .text(GAME_WIDTH / 2, JAR_TOP + 45, t('newFruitBanner', { fruit: getFruitName(fruit.tier).toUpperCase() }), {
+        fontFamily: FONT_FAMILY,
         fontSize: '15px',
-        fontStyle: '900',
+        fontStyle: 'bold',
         color: '#ffd166',
         backgroundColor: '#1b1e3f',
         padding: { x: 14, y: 7 },
@@ -2114,7 +2115,7 @@ export default class GameScene extends Phaser.Scene {
         rBg.strokeRoundedRect(-170, ry - 14, 340, 28, 10);
       }
       const rTxt = this.add
-        .text(-156, ry, `#${row.rank}   ${row.name}`, {
+        .text(-156, ry, `#${row.rank}   ${row.isPlayer ? t('youLabel') : row.name}`, {
           fontFamily: FONT_FAMILY,
           fontSize: '13px',
           fontStyle: 'bold',
@@ -2148,7 +2149,7 @@ export default class GameScene extends Phaser.Scene {
         bg.strokeRoundedRect(-168, -32, 336, 64, 16);
 
         titleTxt.setText(`${theme.icon}  ${theme.name}`);
-        subTxt.setText(selected ? '✓ ACTIF' : unlocked ? 'Tap' : `🔒 ${theme.unlockDesc}`);
+        subTxt.setText(selected ? t('activeTheme') : unlocked ? t('tapToUse') : `🔒 ${theme.unlockDesc}`);
         subTxt.setColor(selected ? '#39e5b6' : unlocked ? '#cbd5ff' : '#ffd166');
       });
     };

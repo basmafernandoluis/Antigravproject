@@ -81,7 +81,7 @@ class StorageManager {
   }
 
   getLang() {
-    return this.data.lang || 'fr';
+    return this.data.lang || detectSystemLang() || 'en';
   }
 
   setLang(lang) {
