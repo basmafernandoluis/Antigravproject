@@ -173,8 +173,10 @@ class AdManager {
     }
 
     let earnedReward = null;
+    let rewardHandle = null;
     let dismissHandle = null;
     let failHandle = null;
+    let safetyTimer = null;
 
     try {
       if (!this.rewardedReady) {
@@ -186,37 +188,60 @@ class AdManager {
 
       this.rewardedReady = false;
 
-      let resolveDismissed;
-      const dismissedPromise = new Promise((resolve) => {
-        resolveDismissed = resolve;
+      let resolveClosed;
+      const closedPromise = new Promise((resolve) => {
+        resolveClosed = resolve;
       });
-      dismissHandle = await AdMob.addListener(RewardAdPluginEvents.Dismissed, resolveDismissed);
-      failHandle = await AdMob.addListener(RewardAdPluginEvents.FailedToShow, resolveDismissed);
 
-      const rewardItem = await AdMob.showRewardVideoAd();
-      if (rewardItem) {
-        earnedReward = rewardItem;
-        firebaseManager.logEvent('ad_rewarded', { native: true });
-      }
+      rewardHandle = await AdMob.addListener(RewardAdPluginEvents.Rewarded, (reward) => {
+        earnedReward = reward || { type: 'reward', amount: 1 };
+      });
+      dismissHandle = await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
+        resolveClosed();
+      });
+      failHandle = await AdMob.addListener(RewardAdPluginEvents.FailedToShow, () => {
+        resolveClosed();
+      });
 
-      // Wait until the user actually closes the ad (safety cap in case Dismissed never fires)
+      // Do not await showRewardVideoAd alone because closing early never resolves/rejects it on Android
+      AdMob.showRewardVideoAd()
+        .then((rewardItem) => {
+          if (rewardItem && !earnedReward) {
+            earnedReward = rewardItem;
+          }
+        })
+        .catch((err) => {
+          console.warn('[AdManager] showRewardVideoAd rejected:', err);
+          resolveClosed();
+        });
+
       await Promise.race([
-        dismissedPromise,
-        new Promise((resolve) => setTimeout(resolve, 15000)),
+        closedPromise,
+        new Promise((resolve) => {
+          safetyTimer = setTimeout(resolve, 90000);
+        }),
       ]);
+
+      if (earnedReward) {
+        try {
+          firebaseManager.logEvent('ad_rewarded', { native: true });
+        } catch {
+          // Ignore analytics failure
+        }
+      }
     } catch (err) {
       console.warn('[AdManager] Rewarded show failed:', err);
       onError?.(err);
     } finally {
+      if (safetyTimer) clearTimeout(safetyTimer);
+      rewardHandle?.remove?.();
       dismissHandle?.remove?.();
       failHandle?.remove?.();
       this.isShowingAd = false;
       this.preloadRewarded();
       onDismiss?.();
       if (earnedReward) {
-        setTimeout(() => {
-          onReward?.(earnedReward);
-        }, 80);
+        onReward?.(earnedReward);
       }
     }
     return true;

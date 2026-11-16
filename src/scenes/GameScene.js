@@ -865,7 +865,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.input.on('pointerdown', (pointer) => {
       if (this.isGameOver) return;
-      if (pointer.y < 128) return; // Ignore top HUD & booster clicks
+      if (pointer.y < 146) return; // Ignore top HUD & booster clicks
 
       if (this.pinMode) {
         this.tryPopFruitAt(pointer.x, pointer.y);
@@ -1679,7 +1679,7 @@ export default class GameScene extends Phaser.Scene {
 
     adManager.showRewarded({
       onStart: () => this.pauseForAd(),
-      onReward: () => this._executeShake(),
+      onReward: () => this.time.delayedCall(60, () => this._executeShake()),
       onDismiss: () => this.resumeFromAd(),
     });
   }
@@ -1703,7 +1703,7 @@ export default class GameScene extends Phaser.Scene {
 
     adManager.showRewarded({
       onStart: () => this.pauseForAd(),
-      onReward: () => this._executePin(),
+      onReward: () => this.time.delayedCall(60, () => this._executePin()),
       onDismiss: () => this.resumeFromAd(),
     });
   }
