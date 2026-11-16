@@ -67,7 +67,8 @@ export default class GameScene extends Phaser.Scene {
     this.setupCollisions();
 
     // Pick initial current & next fruit
-    this.nextTier = Phaser.Math.Between(0, MAX_SPAWN_TIER);
+    this.spawnTierStage = 0;
+    this.nextTier = this.pickNextSpawnTier();
     this.prepareNextDrop();
 
     // First-time micro-tutorial
@@ -608,10 +609,32 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  pickNextSpawnTier() {
+    let maxTier = MAX_SPAWN_TIER;
+    if (this.score >= 1800) {
+      maxTier = Math.min(FRUITS.length - 1, MAX_SPAWN_TIER + 2);
+      if (this.spawnTierStage < 2) {
+        this.spawnTierStage = 2;
+        this.showToast('⚡ NIVEAU SUP : Poire débloquée !');
+      }
+    } else if (this.score >= 600) {
+      maxTier = Math.min(FRUITS.length - 1, MAX_SPAWN_TIER + 1);
+      if (this.spawnTierStage < 1) {
+        this.spawnTierStage = 1;
+        this.showToast('🍎 ACCÉLÉRATION : Pomme débloquée !');
+      }
+    }
+    // Slightly reduce tiny Cerise spam once mid-game is reached
+    if (this.score >= 1200 && Math.random() < 0.7) {
+      return Phaser.Math.Between(1, maxTier);
+    }
+    return Phaser.Math.Between(0, maxTier);
+  }
+
   prepareNextDrop() {
     if (this.isGameOver) return;
     this.currentTier = this.nextTier;
-    this.nextTier = Phaser.Math.Between(0, MAX_SPAWN_TIER);
+    this.nextTier = this.pickNextSpawnTier();
 
     const fruitCfg = FRUITS[this.currentTier];
     this.dropperFruit.setTexture(`fruit_${this.currentTier}`);

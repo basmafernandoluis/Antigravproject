@@ -53,7 +53,7 @@ export const FRUITS = [
   {
     tier: 5,
     name: 'Pomme',
-    radius: 52,
+    radius: 49,
     color: 0xe63946,
     highlight: 0xff758f,
     shadow: 0xa4161a,
@@ -64,7 +64,7 @@ export const FRUITS = [
   {
     tier: 6,
     name: 'Poire',
-    radius: 60,
+    radius: 56,
     color: 0xc7e83a,
     highlight: 0xe9ff80,
     shadow: 0x8fb312,
@@ -74,7 +74,7 @@ export const FRUITS = [
   {
     tier: 7,
     name: 'Pêche',
-    radius: 69,
+    radius: 63,
     color: 0xff85a1,
     highlight: 0xffc2d1,
     shadow: 0xd94f70,
@@ -84,7 +84,7 @@ export const FRUITS = [
   {
     tier: 8,
     name: 'Ananas',
-    radius: 79,
+    radius: 71,
     color: 0xffd166,
     highlight: 0xfff0a5,
     shadow: 0xd49a1a,
@@ -95,7 +95,7 @@ export const FRUITS = [
   {
     tier: 9,
     name: 'Melon',
-    radius: 90,
+    radius: 80,
     color: 0x80ed99,
     highlight: 0xc7f9cc,
     shadow: 0x38b000,
@@ -105,7 +105,7 @@ export const FRUITS = [
   {
     tier: 10,
     name: 'Pastèque',
-    radius: 104,
+    radius: 90,
     color: 0x2ec4b6,
     highlight: 0x80ffdb,
     shadow: 0x0b7a6f,
