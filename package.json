@@ -24,6 +24,7 @@
   "dependencies": {
     "@capacitor-community/admob": "^8.3.0",
     "@capacitor/core": "^8.6.2",
+    "firebase": "^13.4.0",
     "phaser": "^4.2.1"
   },
   "devDependencies": {

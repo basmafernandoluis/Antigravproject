@@ -6,6 +6,7 @@ import { soundFX } from '../utils/sound.js';
 import { haptics } from '../utils/haptics.js';
 import { adManager } from '../managers/AdManager.js';
 import { storageManager } from '../managers/StorageManager.js';
+import { firebaseManager } from '../managers/FirebaseManager.js';
 import { THEMES, getThemeById } from '../config/themes.js';
 import { t, getFruitName, SUPPORTED_LANGS } from '../config/i18n.js';
 import { getLevelConfig } from '../config/levels.js';
@@ -46,6 +47,7 @@ export default class GameScene extends Phaser.Scene {
   create() {
     generateGameTextures(this);
     adManager.init();
+    firebaseManager.init();
     haptics.setEnabled(storageManager.isHapticsEnabled());
 
     this.score = 0;
@@ -53,7 +55,12 @@ export default class GameScene extends Phaser.Scene {
     this.gameMode = storageManager.getGameMode();
     this.campaignLevel = storageManager.getCampaignLevel();
     this.levelCfg = getLevelConfig(this.campaignLevel);
-    this.movesLeft = this.levelCfg.maxMoves;
+    const extraMoves = firebaseManager.getNumber('extra_moves_bonus', 0);
+    this.movesLeft = Math.max(8, this.levelCfg.maxMoves + extraMoves);
+    firebaseManager.logEvent('level_start', {
+      mode: this.gameMode,
+      level: this.campaignLevel,
+    });
     this.isGameOver = false;
     this.canDrop = true;
     this.pinMode = false;
@@ -667,13 +674,15 @@ export default class GameScene extends Phaser.Scene {
 
   pickNextSpawnTier() {
     let maxTier = MAX_SPAWN_TIER;
-    if (this.score >= 1800) {
+    const pearUnlock = firebaseManager.getNumber('pear_unlock_score', 1800);
+    const appleUnlock = firebaseManager.getNumber('apple_unlock_score', 600);
+    if (this.score >= pearUnlock) {
       maxTier = Math.min(FRUITS.length - 1, MAX_SPAWN_TIER + 2);
       if (this.spawnTierStage < 2) {
         this.spawnTierStage = 2;
         this.showToast(t('unlockPear'));
       }
-    } else if (this.score >= 600) {
+    } else if (this.score >= appleUnlock) {
       maxTier = Math.min(FRUITS.length - 1, MAX_SPAWN_TIER + 1);
       if (this.spawnTierStage < 1) {
         this.spawnTierStage = 1;
@@ -934,7 +943,8 @@ export default class GameScene extends Phaser.Scene {
     const nextTier = tier + 1;
 
     // Score update
-    const gained = FRUITS[nextTier].score * this.comboCount;
+    const mult = Math.max(1, firebaseManager.getNumber('score_multiplier', 1));
+    const gained = Math.round(FRUITS[nextTier].score * this.comboCount * mult);
     this.score += gained;
     this.scoreText.setText(String(this.score));
 
@@ -1267,6 +1277,17 @@ export default class GameScene extends Phaser.Scene {
     storageManager.incrementGamesPlayed();
     storageManager.addXp(100 + stars * 40);
     storageManager.recordDailyProgress({ score: this.score, maxTier: this.levelCfg.targetTier, gameEnded: true });
+    firebaseManager.logEvent('level_complete', {
+      level: this.campaignLevel,
+      stars,
+      moves_left: this.movesLeft,
+      score: this.score,
+    });
+    firebaseManager.submitScore({
+      seasonPoints: storageManager.getSeasonPoints(),
+      bestScore: storageManager.getBestScore(),
+      campaignLevel: storageManager.getCampaignLevel(),
+    });
     this.refreshQuestBadge();
     this.refreshBoosterLabels();
 
@@ -1535,6 +1556,17 @@ export default class GameScene extends Phaser.Scene {
     storageManager.incrementGamesPlayed();
     storageManager.addSeasonPoints(Math.round(this.score / 25));
     storageManager.recordDailyProgress({ score: this.score, gameEnded: true });
+    firebaseManager.logEvent('game_over', {
+      mode: this.gameMode,
+      level: this.campaignLevel,
+      reason,
+      score: this.score,
+    });
+    firebaseManager.submitScore({
+      seasonPoints: storageManager.getSeasonPoints(),
+      bestScore: storageManager.getBestScore(),
+      campaignLevel: storageManager.getCampaignLevel(),
+    });
     const xpEarned = Math.max(25, Math.round(this.score / 12));
     const rankRes = storageManager.addXp(xpEarned);
     this.refreshQuestBadge();
@@ -2045,6 +2077,12 @@ export default class GameScene extends Phaser.Scene {
             soundFX.playLevelWin();
             haptics.levelWin();
             storageManager.claimQuest(q.id);
+            firebaseManager.logEvent('quest_claimed', { quest_id: q.id });
+            firebaseManager.submitScore({
+              seasonPoints: storageManager.getSeasonPoints(),
+              bestScore: storageManager.getBestScore(),
+              campaignLevel: storageManager.getCampaignLevel(),
+            });
             this.spawnConfetti(GAME_WIDTH / 2, GAME_HEIGHT / 2, 24);
             this.refreshQuestBadge();
             this.refreshBoosterLabels();
@@ -2066,71 +2104,81 @@ export default class GameScene extends Phaser.Scene {
     };
     buildQuests();
 
-    // --- TAB 2: WEEKLY LEAGUE RANKING ---
+    // --- TAB 2: WEEKLY LEAGUE RANKING (Firestore Live + Offline Fallback) ---
     const seasonPts = storageManager.getSeasonPoints();
     const { current: curLeague, next: nextLeague } = getLeagueForPoints(seasonPts);
-    const board = buildWeeklyLeaderboard(seasonPts);
-    const playerRow = board.find((r) => r.isPlayer) || { rank: 1 };
 
-    const leagueHdrBg = this.add.graphics();
-    leagueHdrBg.fillStyle(0x262b59, 1);
-    leagueHdrBg.fillRoundedRect(-170, -182, 340, 62, 16);
-    leagueHdrBg.lineStyle(2, 0xffd166, 0.75);
-    leagueHdrBg.strokeRoundedRect(-170, -182, 340, 62, 16);
+    const renderLeagueBoard = (board, isLive = false) => {
+      leagueGroup.removeAll(true);
+      const playerRow = board.find((r) => r.isPlayer) || { rank: 1 };
 
-    const leagueTitle = this.add
-      .text(0, -162, `${curLeague.icon}  ${t('leagueTitle', { name: curLeague.name })}`, {
-        fontFamily: FONT_FAMILY,
-        fontSize: '18px',
-        fontStyle: 'bold',
-        color: curLeague.color,
-      })
-      .setOrigin(0.5);
+      const leagueHdrBg = this.add.graphics();
+      leagueHdrBg.fillStyle(0x262b59, 1);
+      leagueHdrBg.fillRoundedRect(-170, -182, 340, 62, 16);
+      leagueHdrBg.lineStyle(2, 0xffd166, 0.75);
+      leagueHdrBg.strokeRoundedRect(-170, -182, 340, 62, 16);
 
-    const leagueSub = this.add
-      .text(
-        0,
-        -136,
-        `${t('yourRank', { rank: playerRow.rank })}  •  ${seasonPts} pts${
-          nextLeague ? `  (➜ ${nextLeague.icon} ${nextLeague.minPts})` : ''
-        }`,
-        {
+      const liveTag = isLive ? ' 🌍' : '';
+      const leagueTitle = this.add
+        .text(0, -162, `${curLeague.icon}  ${t('leagueTitle', { name: curLeague.name })}${liveTag}`, {
           fontFamily: FONT_FAMILY,
-          fontSize: '12px',
+          fontSize: '18px',
           fontStyle: 'bold',
-          color: '#cbd5ff',
+          color: curLeague.color,
+        })
+        .setOrigin(0.5);
+
+      const leagueSub = this.add
+        .text(
+          0,
+          -136,
+          `${t('yourRank', { rank: playerRow.rank })}  •  ${seasonPts} pts${
+            nextLeague ? `  (➜ ${nextLeague.icon} ${nextLeague.minPts})` : ''
+          }`,
+          {
+            fontFamily: FONT_FAMILY,
+            fontSize: '12px',
+            fontStyle: 'bold',
+            color: '#cbd5ff',
+          }
+        )
+        .setOrigin(0.5);
+
+      leagueGroup.add([leagueHdrBg, leagueTitle, leagueSub]);
+
+      board.forEach((row, idx) => {
+        const ry = -96 + idx * 34;
+        const rBg = this.add.graphics();
+        rBg.fillStyle(row.isPlayer ? 0x3a0ca3 : 0x20244a, row.isPlayer ? 1 : 0.85);
+        rBg.fillRoundedRect(-170, ry - 14, 340, 28, 10);
+        if (row.isPlayer) {
+          rBg.lineStyle(1.5, 0x06d6a0, 1);
+          rBg.strokeRoundedRect(-170, ry - 14, 340, 28, 10);
         }
-      )
-      .setOrigin(0.5);
+        const rTxt = this.add
+          .text(-156, ry, `#${row.rank}   ${row.isPlayer ? t('youLabel') : row.name}`, {
+            fontFamily: FONT_FAMILY,
+            fontSize: '13px',
+            fontStyle: 'bold',
+            color: row.isPlayer ? '#06d6a0' : '#ffffff',
+          })
+          .setOrigin(0, 0.5);
+        const pTxt = this.add
+          .text(156, ry, `${row.pts} pts`, {
+            fontFamily: FONT_FAMILY,
+            fontSize: '13px',
+            fontStyle: 'bold',
+            color: '#ffd166',
+          })
+          .setOrigin(1, 0.5);
+        leagueGroup.add([rBg, rTxt, pTxt]);
+      });
+    };
 
-    leagueGroup.add([leagueHdrBg, leagueTitle, leagueSub]);
-
-    board.forEach((row, idx) => {
-      const ry = -96 + idx * 34;
-      const rBg = this.add.graphics();
-      rBg.fillStyle(row.isPlayer ? 0x3a0ca3 : 0x20244a, row.isPlayer ? 1 : 0.85);
-      rBg.fillRoundedRect(-170, ry - 14, 340, 28, 10);
-      if (row.isPlayer) {
-        rBg.lineStyle(1.5, 0x06d6a0, 1);
-        rBg.strokeRoundedRect(-170, ry - 14, 340, 28, 10);
-      }
-      const rTxt = this.add
-        .text(-156, ry, `#${row.rank}   ${row.isPlayer ? t('youLabel') : row.name}`, {
-          fontFamily: FONT_FAMILY,
-          fontSize: '13px',
-          fontStyle: 'bold',
-          color: row.isPlayer ? '#06d6a0' : '#ffffff',
-        })
-        .setOrigin(0, 0.5);
-      const pTxt = this.add
-        .text(156, ry, `${row.pts} pts`, {
-          fontFamily: FONT_FAMILY,
-          fontSize: '13px',
-          fontStyle: 'bold',
-          color: '#ffd166',
-        })
-        .setOrigin(1, 0.5);
-      leagueGroup.add([rBg, rTxt, pTxt]);
+    renderLeagueBoard(buildWeeklyLeaderboard(seasonPts), false);
+    firebaseManager.fetchLeaderboard(seasonPts, 8).then(({ rows, isLive }) => {
+      if (!card.scene) return;
+      renderLeagueBoard(rows, isLive);
     });
 
     // --- TAB 3: VISUAL THEMES ---

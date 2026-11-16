@@ -104,17 +104,15 @@ class AdManager {
     // Never show ads in the first 60 seconds
     if (now - this.appStartTime < AD_RULES.MIN_FIRST_INTERSTITIAL_MS) return false;
 
-    // Cooldown between interstitials
-    if (
-      this.lastInterstitialTime > 0 &&
-      now - this.lastInterstitialTime < AD_RULES.INTERSTITIAL_COOLDOWN_MS
-    ) {
+    const cooldownMs = firebaseManager.getNumber('interstitial_cooldown_ms', AD_RULES.INTERSTITIAL_COOLDOWN_MS);
+    if (this.lastInterstitialTime > 0 && now - this.lastInterstitialTime < cooldownMs) {
       return false;
     }
 
     // Frequency cap: every N games
+    const everyN = Math.max(1, firebaseManager.getNumber('interstitial_min_games', AD_RULES.INTERSTITIAL_EVERY_N_GAMES));
     const gamesPlayed = storageManager.getGamesPlayed();
-    if (gamesPlayed === 0 || gamesPlayed % AD_RULES.INTERSTITIAL_EVERY_N_GAMES !== 0) {
+    if (gamesPlayed === 0 || gamesPlayed % everyN !== 0) {
       return false;
     }
 
@@ -133,6 +131,7 @@ class AdManager {
     if (!this.isNative()) {
       // Web simulation
       this.lastInterstitialTime = Date.now();
+      firebaseManager.logEvent('ad_interstitial', { native: false });
       setTimeout(() => {
         this.isShowingAd = false;
         onDismiss?.();
@@ -144,6 +143,7 @@ class AdManager {
       this.interstitialReady = false;
       await AdMob.showInterstitial();
       this.lastInterstitialTime = Date.now();
+      firebaseManager.logEvent('ad_interstitial', { native: true });
     } catch (err) {
       console.warn('[AdManager] Interstitial show failed:', err);
     } finally {
@@ -164,6 +164,7 @@ class AdManager {
       // Web simulation: reward granted after short delay
       setTimeout(() => {
         this.isShowingAd = false;
+        firebaseManager.logEvent('ad_rewarded', { native: false });
         onReward?.();
         onDismiss?.();
       }, 350);
@@ -181,6 +182,7 @@ class AdManager {
       this.rewardedReady = false;
       const rewardItem = await AdMob.showRewardVideoAd();
       if (rewardItem) {
+        firebaseManager.logEvent('ad_rewarded', { native: true });
         onReward?.(rewardItem);
       }
     } catch (err) {

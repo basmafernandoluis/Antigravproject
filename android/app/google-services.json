@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "90643269212",
+    "project_id": "juicy-drop-ac732",
+    "storage_bucket": "juicy-drop-ac732.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:90643269212:android:28d2cef98bc5f2ee5d8899",
+        "android_client_info": {
+          "package_name": "com.appwizards.juicydrop"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEIZESgBVVdICCKFUQ61kmIbnkDGnoK28"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
