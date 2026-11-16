@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { FRUITS, MAX_SPAWN_TIER } from '../config/fruits.js';
 import { AD_RULES } from '../config/ads.js';
 import { generateGameTextures } from '../utils/textures.js';
@@ -494,47 +496,53 @@ export default class GameScene extends Phaser.Scene {
   }
 
   createBoosterButtons() {
-    const makeArcadePill = (x, y, label, fillColor, lipColor, onClick) => {
+    const makeIconTile = (x, y, emoji, fillColor, lipColor, onClick) => {
       const container = this.add.container(x, y).setDepth(12);
-      const w = 148;
-      const h = 31;
+      const w = 68;
+      const h = 64;
       const bg = this.add.graphics();
       // 3D bottom lip
       bg.fillStyle(lipColor, 1);
-      bg.fillRoundedRect(-w / 2, -h / 2 + 3, w, h, 15);
-      // Main pill body
+      bg.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 18);
+      // Main tile body
       bg.fillStyle(fillColor, 1);
-      bg.fillRoundedRect(-w / 2, -h / 2, w, h, 15);
-      // Subtle top glossy highlight
-      bg.fillStyle(0xffffff, 0.16);
-      bg.fillRoundedRect(-w / 2 + 8, -h / 2 + 2, w - 16, 7, 3);
+      bg.fillRoundedRect(-w / 2, -h / 2, w, h, 18);
+      // Glossy top highlight
+      bg.fillStyle(0xffffff, 0.22);
+      bg.fillRoundedRect(-w / 2 + 7, -h / 2 + 3, w - 14, 14, 7);
       // Crisp border
-      bg.lineStyle(1.5, 0xffffff, 0.45);
-      bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 15);
+      bg.lineStyle(2, 0xffffff, 0.5);
+      bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 18);
 
-      const txt = this.add
-        .text(0, 0, label, {
+      const iconTxt = this.add.text(0, -8, emoji, { fontSize: '26px' }).setOrigin(0.5);
+
+      const badgeBg = this.add.graphics();
+      badgeBg.fillStyle(0x0b0824, 0.72);
+      badgeBg.fillRoundedRect(-26, 11, 52, 17, 8);
+
+      const badgeTxt = this.add
+        .text(0, 19, '', {
           fontFamily: FONT_FAMILY,
-          fontSize: '12px',
+          fontSize: '10px',
           fontStyle: 'bold',
-          color: '#ffffff',
+          color: '#ffd166',
         })
         .setOrigin(0.5);
 
-      const zone = this.add.zone(0, 0, w, h + 4).setInteractive({ useHandCursor: true });
+      const zone = this.add.zone(0, 0, w + 4, h + 4).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', (pointer) => {
         pointer.event?.stopPropagation?.();
         soundFX.playClick();
-        this.tweens.add({ targets: container, scale: 0.92, duration: 65, yoyo: true });
+        this.tweens.add({ targets: container, scale: 0.9, duration: 65, yoyo: true });
         onClick();
       });
 
-      container.add([bg, txt, zone]);
-      return { container, txt };
+      container.add([bg, iconTxt, badgeBg, badgeTxt, zone]);
+      return { container, txt: badgeTxt };
     };
 
-    const shakeObj = makeArcadePill(274, 88, '', 0x7b2cbf, 0x3c096c, () => this.triggerShakeBooster());
-    const pinObj = makeArcadePill(274, 125, '', 0xff3b5c, 0xa4133c, () => this.triggerPinBooster());
+    const shakeObj = makeIconTile(236, 108, '🌪️', 0x7b2cbf, 0x3c096c, () => this.triggerShakeBooster());
+    const pinObj = makeIconTile(312, 108, '📌', 0xff3b5c, 0xa4133c, () => this.triggerPinBooster());
     this.shakeContainer = shakeObj.container;
     this.pinContainer = pinObj.container;
     this.shakeBtnTxt = shakeObj.txt;
@@ -546,17 +554,14 @@ export default class GameScene extends Phaser.Scene {
 
   refreshBoosterLabels() {
     const tokens = storageManager.getFreeTokens();
-    const prefix = tokens > 0 ? '🎁' : '▶';
-    const suffix = tokens > 0 ? ` (${tokens})` : '';
+    const baseBadge = tokens > 0 ? `🎁 ${tokens}` : '▶ AD';
     if (this.shakeBtnTxt) {
-      this.shakeBtnTxt.setText(
-        this.shakeNudged ? `${prefix} ${t('autoMerge')}` : `${prefix} ${t('shake')}${suffix}`
-      );
+      this.shakeBtnTxt.setColor(this.shakeNudged ? '#80ffdb' : '#ffd166');
+      this.shakeBtnTxt.setText(this.shakeNudged ? '⚡ AUTO!' : baseBadge);
     }
     if (this.pinBtnTxt) {
-      this.pinBtnTxt.setText(
-        this.pinNudged ? `${prefix} ${t('saveMe')}` : `${prefix} ${t('pin')}${suffix}`
-      );
+      this.pinBtnTxt.setColor(this.pinNudged ? '#80ffdb' : '#ffd166');
+      this.pinBtnTxt.setText(this.pinNudged ? '🆘 SOS!' : baseBadge);
     }
   }
 
@@ -1308,15 +1313,15 @@ export default class GameScene extends Phaser.Scene {
 
     const cardBg = this.add.graphics();
     cardBg.fillStyle(0x1b1e3f, 1);
-    cardBg.fillRoundedRect(-175, -195, 350, 390, 26);
+    cardBg.fillRoundedRect(-175, -220, 350, 446, 26);
     cardBg.lineStyle(3, 0xffd166, 0.95);
-    cardBg.strokeRoundedRect(-175, -195, 350, 390, 26);
+    cardBg.strokeRoundedRect(-175, -220, 350, 446, 26);
 
     const starsStr = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
-    const starsTxt = this.add.text(0, -142, starsStr, { fontSize: '42px' }).setOrigin(0.5);
+    const starsTxt = this.add.text(0, -168, starsStr, { fontSize: '42px' }).setOrigin(0.5);
 
     const title = this.add
-      .text(0, -86, t('levelWinTitle', { n: this.campaignLevel }), {
+      .text(0, -112, t('levelWinTitle', { n: this.campaignLevel }), {
         fontFamily: FONT_FAMILY,
         fontSize: '25px',
         fontStyle: 'bold',
@@ -1325,7 +1330,7 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const sub = this.add
-      .text(0, -46, t('levelWinSub', { left: this.movesLeft }), {
+      .text(0, -72, t('levelWinSub', { left: this.movesLeft }), {
         fontFamily: FONT_FAMILY,
         fontSize: '14px',
         fontStyle: 'bold',
@@ -1336,7 +1341,7 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const scoreVal = this.add
-      .text(0, 6, t('finalScore', { score: this.score }), {
+      .text(0, -22, t('finalScore', { score: this.score }), {
         fontFamily: FONT_FAMILY,
         fontSize: '24px',
         fontStyle: 'bold',
@@ -1344,7 +1349,7 @@ export default class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    const nextBtn = this.makeModalButton(0, 82, t('nextLevelBtn'), 0x06d6a0, '#0b132b', () => {
+    const nextBtn = this.makeModalButton(0, 48, t('nextLevelBtn'), 0x06d6a0, '#0b132b', () => {
       adManager.showInterstitialIfEligible({
         onStart: () => this.pauseForAd(),
         onDismiss: () => {
@@ -1354,11 +1359,15 @@ export default class GameScene extends Phaser.Scene {
       });
     });
 
-    const replayBtn = this.makeModalButton(0, 144, t('replayBtn'), 0x3a0ca3, '#ffffff', () => {
+    const replayBtn = this.makeModalButton(0, 108, t('replayBtn'), 0x3a0ca3, '#ffffff', () => {
       this.scene.restart();
     });
 
-    card.add([cardBg, starsTxt, title, sub, scoreVal, nextBtn, replayBtn]);
+    const quitBtn = this.makeModalButton(0, 168, t('quitBtn'), 0x2b2d42, '#ffffff', () => {
+      this.quitGame();
+    });
+
+    card.add([cardBg, starsTxt, title, sub, scoreVal, nextBtn, replayBtn, quitBtn]);
     this.gameOverObjects = [overlay, card];
 
     this.tweens.add({
@@ -1368,6 +1377,17 @@ export default class GameScene extends Phaser.Scene {
       duration: 240,
       ease: 'Back.easeOut',
     });
+  }
+
+  quitGame() {
+    if (Capacitor.isNativePlatform()) {
+      App.exitApp();
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      window.close();
+    }
+    this.showToast('👋');
   }
 
   pauseForAd() {
@@ -1599,7 +1619,7 @@ export default class GameScene extends Phaser.Scene {
       .setScale(0.6)
       .setAlpha(0);
 
-    const cardH = (canContinue ? 435 : 380) + (canDoubleScore ? 0 : -50);
+    const cardH = (canContinue ? 491 : 436) + (canDoubleScore ? 0 : -50);
     const cardTop = -cardH / 2;
 
     const cardBg = this.add.graphics();
@@ -1713,6 +1733,13 @@ export default class GameScene extends Phaser.Scene {
       });
     });
     card.add(replayBtn);
+    nextY += 56;
+
+    // 4. Quit Game Button
+    const quitBtn = this.makeModalButton(0, nextY, t('quitBtn'), 0x2b2d42, '#ffffff', () => {
+      this.quitGame();
+    });
+    card.add(quitBtn);
 
     this.gameOverObjects = [overlay, card];
 

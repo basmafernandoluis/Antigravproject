@@ -23,6 +23,7 @@
   "homepage": "https://github.com/basmafernandoluis/Antigravproject#readme",
   "dependencies": {
     "@capacitor-community/admob": "^8.3.0",
+    "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.6.2",
     "firebase": "^13.4.0",
     "phaser": "^4.2.1"

@@ -326,21 +326,27 @@ DICT.fr.activeTheme = '✓ ACTIF';
 DICT.fr.tapToUse = 'Toucher pour activer';
 DICT.fr.youLabel = 'TOI';
 DICT.fr.newFruitBanner = '🌟 NOUVEAU FRUIT : {fruit} !';
+DICT.fr.quitBtn = '🚪  QUITTER';
 
 DICT.en.activeTheme = '✓ ACTIVE';
 DICT.en.tapToUse = 'Tap to equip';
 DICT.en.youLabel = 'YOU';
 DICT.en.newFruitBanner = '🌟 NEW FRUIT: {fruit}!';
+DICT.en.quitBtn = '🚪  QUIT';
 
 DICT.de.activeTheme = '✓ AKTIV';
 DICT.de.tapToUse = 'Tippen zum Aktivieren';
 DICT.de.youLabel = 'DU';
 DICT.de.newFruitBanner = '🌟 NEUE FRUCHT: {fruit}!';
+DICT.de.quitBtn = '🚪  BEENDEN';
 
 DICT.ja.activeTheme = '✓ 使用中';
 DICT.ja.tapToUse = 'タップで変更';
 DICT.ja.youLabel = 'あなた';
 DICT.ja.newFruitBanner = '🌟 新フルーツ: {fruit}！';
+DICT.ja.quitBtn = '🚪  おわる';
+
+DICT.ar.quitBtn = '🚪  خروج';
 
 export function detectSystemLang() {
   if (typeof navigator === 'undefined') return 'en';
