@@ -9,6 +9,7 @@ import { THEMES, getThemeById } from '../config/themes.js';
 
 const GAME_WIDTH = 480;
 const GAME_HEIGHT = 854;
+const FONT_FAMILY = 'Fredoka, "Arial Rounded MT Bold", "Trebuchet MS", sans-serif';
 
 // Container / Jar geometry
 const JAR_LEFT = 36;
@@ -108,6 +109,12 @@ export default class GameScene extends Phaser.Scene {
     this.bgGraphics.clear();
     this.bgGraphics.fillGradientStyle(theme.bgTop, theme.bgTop, theme.bgBottom, theme.bgBottom, 1);
     this.bgGraphics.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+    // Warm ambient spotlight behind jar for depth
+    this.bgGraphics.fillStyle(theme.glowColor, 0.12);
+    this.bgGraphics.fillCircle(GAME_WIDTH / 2, JAR_TOP + 220, 230);
+    this.bgGraphics.fillStyle(0xffffff, 0.04);
+    this.bgGraphics.fillCircle(GAME_WIDTH / 2, JAR_TOP + 220, 145);
   }
 
   createJar() {
@@ -147,31 +154,40 @@ export default class GameScene extends Phaser.Scene {
       wallOpts
     );
 
-    // Danger line (dashed)
+    // Danger line (neon dashed + pill badge)
     this.dangerLine = this.add.graphics();
-    this.drawDangerLine(0.35);
+    this.drawDangerLine(0.55);
 
+    this.dangerBadge = this.add.container(JAR_RIGHT - 42, DANGER_Y - 14).setAlpha(0.85);
+    const badgeBg = this.add.graphics();
+    badgeBg.fillStyle(0xff3b5c, 0.28);
+    badgeBg.fillRoundedRect(-34, -10, 68, 20, 10);
+    badgeBg.lineStyle(1.5, 0xff4d6d, 0.85);
+    badgeBg.strokeRoundedRect(-34, -10, 68, 20, 10);
     this.dangerLabel = this.add
-      .text(JAR_RIGHT - 8, DANGER_Y - 14, 'LIMITE', {
-        fontSize: '11px',
+      .text(0, 0, '⚠ LIMITE', {
+        fontFamily: FONT_FAMILY,
+        fontSize: '10px',
         fontStyle: 'bold',
-        color: '#ff4d6d',
+        color: '#ffccd5',
       })
-      .setOrigin(1, 0.5)
-      .setAlpha(0.55);
+      .setOrigin(0.5);
+    this.dangerBadge.add([badgeBg, this.dangerLabel]);
 
     // Danger countdown bar (hidden unless overflowing)
-    this.dangerBarBg = this.add.rectangle(GAME_WIDTH / 2, DANGER_Y - 26, 180, 8, 0x000000, 0.45).setVisible(false);
-    this.dangerBarFill = this.add.rectangle(GAME_WIDTH / 2 - 90, DANGER_Y - 26, 0, 8, 0xff3b5c, 1).setOrigin(0, 0.5).setVisible(false);
+    this.dangerBarBg = this.add.rectangle(GAME_WIDTH / 2, DANGER_Y - 26, 180, 10, 0x0b0726, 0.7).setVisible(false);
+    this.dangerBarFill = this.add.rectangle(GAME_WIDTH / 2 - 90, DANGER_Y - 26, 0, 10, 0xff3b5c, 1).setOrigin(0, 0.5).setVisible(false);
   }
 
   drawDangerLine(alpha) {
     this.dangerLine.clear();
-    this.dangerLine.lineStyle(2, 0xff3b5c, alpha);
-    const dashLen = 10;
+    this.dangerLine.lineStyle(4, 0xff3b5c, alpha * 0.35);
+    this.dangerLine.lineBetween(JAR_LEFT + 10, DANGER_Y, JAR_RIGHT - 10, DANGER_Y);
+    this.dangerLine.lineStyle(2.5, 0xff758f, alpha);
+    const dashLen = 12;
     const gapLen = 8;
-    for (let x = JAR_LEFT + 8; x < JAR_RIGHT - 8; x += dashLen + gapLen) {
-      this.dangerLine.lineBetween(x, DANGER_Y, Math.min(x + dashLen, JAR_RIGHT - 8), DANGER_Y);
+    for (let x = JAR_LEFT + 10; x < JAR_RIGHT - 10; x += dashLen + gapLen) {
+      this.dangerLine.lineBetween(x, DANGER_Y, Math.min(x + dashLen, JAR_RIGHT - 10), DANGER_Y);
     }
   }
 
@@ -183,118 +199,171 @@ export default class GameScene extends Phaser.Scene {
     const glass = this.jarGlass;
     glass.clear();
 
-    glass.fillStyle(0xffffff, theme.glassAlpha);
-    glass.fillRoundedRect(JAR_LEFT, JAR_TOP, jarWidth, jarHeight, { tl: 6, tr: 6, bl: 22, br: 22 });
+    // 3D Pedestal base under jar
+    glass.fillStyle(0x000000, 0.35);
+    glass.fillRoundedRect(JAR_LEFT - 8, JAR_BOTTOM + 6, jarWidth + 16, 16, 8);
+    glass.fillStyle(theme.jarBaseLip, 1);
+    glass.fillRoundedRect(JAR_LEFT - 10, JAR_BOTTOM + 2, jarWidth + 20, 14, 7);
+    glass.fillStyle(theme.jarBase, 1);
+    glass.fillRoundedRect(JAR_LEFT - 10, JAR_BOTTOM - 2, jarWidth + 20, 12, 6);
+    glass.fillStyle(0xffffff, 0.22);
+    glass.fillRoundedRect(JAR_LEFT, JAR_BOTTOM, jarWidth, 3, 2);
 
-    glass.lineStyle(4, theme.jarStroke, 0.65);
+    // Glass interior
+    glass.fillStyle(0xffffff, theme.glassAlpha);
+    glass.fillRoundedRect(JAR_LEFT, JAR_TOP, jarWidth, jarHeight, { tl: 8, tr: 8, bl: 24, br: 24 });
+
+    // Subtle diagonal glass shine
+    glass.fillStyle(0xffffff, 0.045);
+    glass.beginPath();
+    glass.moveTo(JAR_LEFT + 22, JAR_TOP + 20);
+    glass.lineTo(JAR_LEFT + 68, JAR_TOP + 20);
+    glass.lineTo(JAR_LEFT + 28, JAR_BOTTOM - 30);
+    glass.lineTo(JAR_LEFT + 12, JAR_BOTTOM - 30);
+    glass.closePath();
+    glass.fillPath();
+
+    // Outer neon halo + crisp glass border
+    glass.lineStyle(8, theme.jarLip, 0.2);
+    glass.strokeRoundedRect(JAR_LEFT, JAR_TOP, jarWidth, jarHeight, { tl: 8, tr: 8, bl: 24, br: 24 });
+
+    glass.lineStyle(4, theme.jarStroke, 0.8);
     glass.beginPath();
     glass.moveTo(JAR_LEFT, JAR_TOP);
-    glass.lineTo(JAR_LEFT, JAR_BOTTOM - 16);
-    glass.arc(JAR_LEFT + 16, JAR_BOTTOM - 16, 16, Math.PI, Math.PI * 0.5, true);
-    glass.lineTo(JAR_RIGHT - 16, JAR_BOTTOM);
-    glass.arc(JAR_RIGHT - 16, JAR_BOTTOM - 16, 16, Math.PI * 0.5, 0, true);
+    glass.lineTo(JAR_LEFT, JAR_BOTTOM - 18);
+    glass.arc(JAR_LEFT + 18, JAR_BOTTOM - 18, 18, Math.PI, Math.PI * 0.5, true);
+    glass.lineTo(JAR_RIGHT - 18, JAR_BOTTOM);
+    glass.arc(JAR_RIGHT - 18, JAR_BOTTOM - 18, 18, Math.PI * 0.5, 0, true);
     glass.lineTo(JAR_RIGHT, JAR_TOP);
     glass.strokePath();
 
-    glass.lineStyle(2, 0xffffff, 0.14);
-    glass.lineBetween(JAR_LEFT + 8, JAR_TOP + 10, JAR_LEFT + 8, JAR_BOTTOM - 28);
+    // Flared 3D Jar Rim / Collar at top
+    glass.fillStyle(theme.jarLip, 0.45);
+    glass.fillRoundedRect(JAR_LEFT - 8, JAR_TOP - 8, 22, 12, 6);
+    glass.fillRoundedRect(JAR_RIGHT - 14, JAR_TOP - 8, 22, 12, 6);
+    glass.lineStyle(2, 0xffffff, 0.55);
+    glass.strokeRoundedRect(JAR_LEFT - 8, JAR_TOP - 8, 22, 12, 6);
+    glass.strokeRoundedRect(JAR_RIGHT - 14, JAR_TOP - 8, 22, 12, 6);
+
+    // Inner left specular edge
+    glass.lineStyle(3, 0xffffff, 0.22);
+    glass.lineBetween(JAR_LEFT + 9, JAR_TOP + 14, JAR_LEFT + 9, JAR_BOTTOM - 32);
   }
 
   createUI() {
-    // Top Header Bar
+    // Juicy 3D Arcade Title
     this.add
-      .text(24, 22, 'JUICY DROP!', {
-        fontSize: '28px',
-        fontStyle: '900',
-        color: '#ffffff',
-        stroke: '#ff3b5c',
-        strokeThickness: 5,
+      .text(24, 24, 'JUICY DROP!', {
+        fontFamily: FONT_FAMILY,
+        fontSize: '29px',
+        fontStyle: 'bold',
+        color: '#ffd166',
+        stroke: '#9d0246',
+        strokeThickness: 7,
       })
-      .setOrigin(0, 0);
+      .setOrigin(0, 0)
+      .setShadow(0, 4, '#2b0938', 4, true, true);
 
-    // Glass Icon Buttons (Collection/Challenges, Sound, Settings)
-    const makeIconBtn = (x, y, iconText, onClick) => {
+    // 3D Candy Icon Buttons (Collection/Challenges, Sound, Settings)
+    const makeIconBtn = (x, y, iconText, fillCol, lipCol, onClick) => {
       const container = this.add.container(x, y).setDepth(12);
       const bg = this.add.graphics();
-      bg.fillStyle(0xffffff, 0.1);
-      bg.fillRoundedRect(-21, -21, 42, 42, 12);
-      bg.lineStyle(1.5, 0x8ecae6, 0.45);
-      bg.strokeRoundedRect(-21, -21, 42, 42, 12);
+      bg.fillStyle(lipCol, 1);
+      bg.fillRoundedRect(-21, -18, 42, 42, 14);
+      bg.fillStyle(fillCol, 1);
+      bg.fillRoundedRect(-21, -21, 42, 42, 14);
+      bg.fillStyle(0xffffff, 0.28);
+      bg.fillRoundedRect(-15, -18, 30, 10, 5);
+      bg.lineStyle(1.5, 0xffffff, 0.45);
+      bg.strokeRoundedRect(-21, -21, 42, 42, 14);
 
-      const txt = this.add.text(0, 0, iconText, { fontSize: '20px' }).setOrigin(0.5);
-      const zone = this.add.zone(0, 0, 42, 42).setInteractive({ useHandCursor: true });
+      const txt = this.add.text(0, -1, iconText, { fontSize: '20px' }).setOrigin(0.5);
+      const zone = this.add.zone(0, 0, 44, 44).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', (pointer) => {
         pointer.event?.stopPropagation?.();
         soundFX.playClick();
-        this.tweens.add({ targets: container, scale: 0.88, duration: 60, yoyo: true });
+        this.tweens.add({ targets: container, scale: 0.86, duration: 65, yoyo: true, ease: 'Back.easeOut' });
         onClick(txt);
       });
       container.add([bg, txt, zone]);
       return { container, txt };
     };
 
-    makeIconBtn(GAME_WIDTH - 142, 40, '🏆', () => {
+    makeIconBtn(GAME_WIDTH - 142, 40, '🏆', 0xff9f1c, 0xb55d00, () => {
       if (!this.isGameOver) {
         this.openRetentionModal();
       }
     });
 
-    const muteObj = makeIconBtn(GAME_WIDTH - 92, 40, soundFX.muted ? '🔇' : '🔊', (txt) => {
+    const muteObj = makeIconBtn(GAME_WIDTH - 92, 40, soundFX.muted ? '🔇' : '🔊', 0x4361ee, 0x243496, (txt) => {
       const muted = soundFX.toggleMute();
       txt.setText(muted ? '🔇' : '🔊');
     });
     this.muteBtn = muteObj.txt;
 
-    makeIconBtn(GAME_WIDTH - 42, 40, '⚙️', () => {
+    makeIconBtn(GAME_WIDTH - 42, 40, '⚙️', 0x7209b7, 0x42056e, () => {
       if (!this.isGameOver) {
         this.openSettingsModal();
       }
     });
 
-    // Score Card (Glossy Glass)
+    // 3D Glossy Score Card
     const scoreBg = this.add.graphics();
-    scoreBg.fillStyle(0x1e224d, 0.85);
-    scoreBg.fillRoundedRect(24, 74, 166, 68, 16);
-    scoreBg.lineStyle(2, 0x8ecae6, 0.45);
-    scoreBg.strokeRoundedRect(24, 74, 166, 68, 16);
+    scoreBg.fillStyle(0x0b0824, 0.6);
+    scoreBg.fillRoundedRect(24, 78, 166, 68, 18);
+    scoreBg.fillStyle(0x23295e, 0.96);
+    scoreBg.fillRoundedRect(24, 74, 166, 68, 18);
+    scoreBg.fillStyle(0xffffff, 0.08);
+    scoreBg.fillRoundedRect(32, 77, 150, 14, 7);
+    scoreBg.lineStyle(2, 0x9bf6ff, 0.65);
+    scoreBg.strokeRoundedRect(24, 74, 166, 68, 18);
 
     this.add.text(36, 82, 'SCORE', {
-      fontSize: '13px',
-      fontStyle: '900',
-      color: '#a5b4fc',
+      fontFamily: FONT_FAMILY,
+      fontSize: '12px',
+      fontStyle: 'bold',
+      color: '#9bf6ff',
     });
 
-    this.scoreText = this.add.text(36, 100, '0', {
-      fontSize: '30px',
-      fontStyle: '900',
+    this.scoreText = this.add.text(36, 98, '0', {
+      fontFamily: FONT_FAMILY,
+      fontSize: '31px',
+      fontStyle: 'bold',
       color: '#ffffff',
       stroke: '#0d0e22',
-      strokeThickness: 3,
+      strokeThickness: 4,
     });
 
     this.bestText = this.add
-      .text(178, 82, `TOP ${this.bestScore}`, {
+      .text(178, 82, `👑 ${this.bestScore}`, {
+        fontFamily: FONT_FAMILY,
         fontSize: '13px',
-        fontStyle: '900',
+        fontStyle: 'bold',
         color: '#ffd166',
       })
       .setOrigin(1, 0);
 
-    // Next Fruit Card (Glossy Glass)
+    // 3D Glossy Next Fruit Card
     const nextBg = this.add.graphics();
-    nextBg.fillStyle(0x1e224d, 0.85);
-    nextBg.fillRoundedRect(GAME_WIDTH - 122, 74, 98, 68, 16);
-    nextBg.lineStyle(2, 0x8ecae6, 0.45);
-    nextBg.strokeRoundedRect(GAME_WIDTH - 122, 74, 98, 68, 16);
+    nextBg.fillStyle(0x0b0824, 0.6);
+    nextBg.fillRoundedRect(GAME_WIDTH - 122, 78, 98, 68, 18);
+    nextBg.fillStyle(0x23295e, 0.96);
+    nextBg.fillRoundedRect(GAME_WIDTH - 122, 74, 98, 68, 18);
+    nextBg.fillStyle(0xffffff, 0.08);
+    nextBg.fillRoundedRect(GAME_WIDTH - 114, 77, 82, 14, 7);
+    nextBg.lineStyle(2, 0xff8fab, 0.65);
+    nextBg.strokeRoundedRect(GAME_WIDTH - 122, 74, 98, 68, 18);
 
     this.add
       .text(GAME_WIDTH - 73, 81, 'SUIVANT', {
-        fontSize: '12px',
-        fontStyle: '900',
-        color: '#a5b4fc',
+        fontFamily: FONT_FAMILY,
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#ffccd5',
       })
       .setOrigin(0.5, 0);
 
+    this.add.circle(GAME_WIDTH - 73, 117, 19, 0xffffff, 0.08);
     this.nextPreviewSprite = this.add.image(GAME_WIDTH - 73, 117, 'fruit_0').setScale(0.75);
 
     // Rewarded Booster Pills (aligned neatly between Score & Next)
@@ -798,7 +867,7 @@ export default class GameScene extends Phaser.Scene {
       const ratio = Phaser.Math.Clamp(this.dangerTimer / 1500, 0, 1);
 
       this.drawDangerLine(0.5 + 0.5 * Math.sin(now * 0.02));
-      this.dangerLabel.setAlpha(1);
+      this.dangerBadge.setAlpha(1);
       this.dangerBarBg.setVisible(true);
       this.dangerBarFill.setVisible(true);
       this.dangerBarFill.width = 180 * ratio;
@@ -811,8 +880,8 @@ export default class GameScene extends Phaser.Scene {
         this.dangerTimer = Math.max(0, this.dangerTimer - delta * 2);
       }
       if (this.dangerTimer === 0) {
-        this.drawDangerLine(0.35);
-        this.dangerLabel.setAlpha(0.55);
+        this.drawDangerLine(0.55);
+        this.dangerBadge.setAlpha(0.85);
         this.dangerBarBg.setVisible(false);
         this.dangerBarFill.setVisible(false);
       }
