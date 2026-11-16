@@ -289,7 +289,7 @@ export default class GameScene extends Phaser.Scene {
       return { container, txt };
     };
 
-    makeIconBtn(GAME_WIDTH - 142, 40, '🏆', 0xff9f1c, 0xb55d00, () => {
+    makeIconBtn(GAME_WIDTH - 142, 40, '🏆', 0x06d6a0, 0x048a66, () => {
       if (!this.isGameOver) {
         this.openRetentionModal();
       }

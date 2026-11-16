@@ -226,6 +226,8 @@ export function generateGameTextures(scene) {
       const my = eyeY + eyeR * 0.9;
       ctx.beginPath();
       ctx.arc(cx - mw, my, mw, 0, Math.PI);
+      ctx.stroke();
+      ctx.beginPath();
       ctx.arc(cx + mw, my, mw, 0, Math.PI);
       ctx.stroke();
     } else if (expr === 1) {
