@@ -1356,7 +1356,7 @@ export default class GameScene extends Phaser.Scene {
     this.matter.world.pause();
 
     const overlay = this.add
-      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.78)
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.8)
       .setDepth(30)
       .setInteractive();
 
@@ -1368,55 +1368,95 @@ export default class GameScene extends Phaser.Scene {
 
     const cardBg = this.add.graphics();
     cardBg.fillStyle(0x1b1e3f, 1);
-    cardBg.fillRoundedRect(-190, -285, 380, 570, 24);
-    cardBg.lineStyle(2.5, 0xffd166, 0.75);
-    cardBg.strokeRoundedRect(-190, -285, 380, 570, 24);
+    cardBg.fillRoundedRect(-190, -255, 380, 510, 26);
+    cardBg.lineStyle(3, 0xffd166, 0.85);
+    cardBg.strokeRoundedRect(-190, -255, 380, 510, 26);
 
-    const title = this.add
-      .text(0, -250, '🏆 DÉFIS & COLLECTION', {
-        fontSize: '21px',
-        fontStyle: '900',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
+    // 2 Spacious Tabs at the top
+    let activeTab = 'daily';
+    const dailyGroup = this.add.container(0, 0);
+    const themesGroup = this.add.container(0, 0).setVisible(false);
 
-    // 1. Daily Challenge Box
+    const makeTab = (x, labelText, tabKey) => {
+      const tCont = this.add.container(x, -208);
+      const bg = this.add.graphics();
+      const txt = this.add
+        .text(0, 0, labelText, {
+          fontFamily: FONT_FAMILY,
+          fontSize: '14px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+        })
+        .setOrigin(0.5);
+      const zone = this.add.zone(0, 0, 162, 40).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', (pointer) => {
+        pointer.event?.stopPropagation?.();
+        soundFX.playClick();
+        activeTab = tabKey;
+        refreshTabs();
+      });
+      tCont.add([bg, txt, zone]);
+      return { tCont, bg, txt, tabKey };
+    };
+
+    const tab1 = makeTab(-86, '🎯 DÉFIS & FRUITS', 'daily');
+    const tab2 = makeTab(86, '🎨 THÈMES', 'themes');
+
+    const refreshTabs = () => {
+      [tab1, tab2].forEach(({ bg, txt, tabKey }) => {
+        const isOn = activeTab === tabKey;
+        bg.clear();
+        bg.fillStyle(isOn ? 0xff9f1c : 0x262b59, 1);
+        bg.fillRoundedRect(-81, -20, 162, 40, 20);
+        bg.lineStyle(2, isOn ? 0xfff3b0 : 0x4a528a, isOn ? 1 : 0.6);
+        bg.strokeRoundedRect(-81, -20, 162, 40, 20);
+        txt.setColor(isOn ? '#0b132b' : '#cbd5ff');
+      });
+      dailyGroup.setVisible(activeTab === 'daily');
+      themesGroup.setVisible(activeTab === 'themes');
+    };
+    refreshTabs();
+
+    // --- TAB 1: DAILY CHALLENGE + FRUIT COLLECTION ---
     const daily = storageManager.getDailyChallenge();
     const dailyBox = this.add.graphics();
     dailyBox.fillStyle(0x262b59, 1);
-    dailyBox.fillRoundedRect(-168, -218, 336, 86, 14);
-    dailyBox.lineStyle(1.5, daily.completed ? 0x06d6a0 : 0x8ecae6, 0.65);
-    dailyBox.strokeRoundedRect(-168, -218, 336, 86, 14);
+    dailyBox.fillRoundedRect(-164, -162, 328, 122, 18);
+    dailyBox.lineStyle(2, daily.completed ? 0x06d6a0 : 0x9bf6ff, 0.75);
+    dailyBox.strokeRoundedRect(-164, -162, 328, 122, 18);
 
-    const dailyHdr = this.add
-      .text(-152, -206, `DÉFI DU JOUR   •   🔥 Série : ${daily.streak} j`, {
-        fontSize: '12px',
-        fontStyle: '900',
-        color: '#ffd166',
-      });
-    const dailyDesc = this.add.text(-152, -184, daily.title, {
+    const dailyHdr = this.add.text(-144, -146, `DÉFI DU JOUR   •   🔥 ${daily.streak} j`, {
+      fontFamily: FONT_FAMILY,
       fontSize: '14px',
       fontStyle: 'bold',
+      color: '#ffd166',
+    });
+    const dailyDesc = this.add.text(-144, -118, daily.title, {
+      fontFamily: FONT_FAMILY,
+      fontSize: '17px',
+      fontStyle: 'bold',
       color: '#ffffff',
+      wordWrap: { width: 292 },
     });
     const dailyStatus = this.add.text(
-      -152,
-      -156,
+      -144,
+      -68,
       daily.completed ? '✅ TERMINÉ AUJOURD’HUI !' : '⏳ En cours — joue pour le valider',
       {
-        fontSize: '12px',
+        fontFamily: FONT_FAMILY,
+        fontSize: '14px',
         fontStyle: 'bold',
         color: daily.completed ? '#06d6a0' : '#a5b4fc',
       }
     );
 
-    // 2. Fruit Collection (11 fruits)
     const maxTier = storageManager.getMaxTierReached();
     const colTitle = this.add
-      .text(0, -112, `COLLECTION DE FRUITS (${Math.min(maxTier + 1, FRUITS.length)} / ${FRUITS.length})`, {
-        fontSize: '13px',
-        fontStyle: '900',
-        color: '#a5b4fc',
+      .text(0, -14, `COLLECTION (${Math.min(maxTier + 1, FRUITS.length)} / ${FRUITS.length} FRUITS)`, {
+        fontFamily: FONT_FAMILY,
+        fontSize: '15px',
+        fontStyle: 'bold',
+        color: '#9bf6ff',
       })
       .setOrigin(0.5);
 
@@ -1425,58 +1465,57 @@ export default class GameScene extends Phaser.Scene {
       const col = idx % 6;
       const row = Math.floor(idx / 6);
       const cx = (row === 0 ? -135 : -108) + col * 54;
-      const cy = -72 + row * 48;
+      const cy = 36 + row * 62;
       const unlocked = idx <= maxTier;
-      const icon = this.add.image(cx, cy, `fruit_${f.tier}`).setDisplaySize(32, 32).setAlpha(unlocked ? 1 : 0.22);
-      colItems.push(icon);
+      const slot = this.add.circle(cx, cy, 22, unlocked ? 0xffffff : 0x0b0824, unlocked ? 0.12 : 0.45);
+      const icon = this.add.image(cx, cy, `fruit_${f.tier}`).setDisplaySize(38, 38).setAlpha(unlocked ? 1 : 0.25);
+      colItems.push(slot, icon);
     });
 
-    // 3. Themes (2x2 grid)
-    const themeTitle = this.add
-      .text(0, 32, 'THÈMES VISUELS', {
-        fontSize: '13px',
-        fontStyle: '900',
-        color: '#a5b4fc',
-      })
-      .setOrigin(0.5);
+    dailyGroup.add([dailyBox, dailyHdr, dailyDesc, dailyStatus, colTitle, ...colItems]);
 
+    // --- TAB 2: VISUAL THEMES (4 large full-width cards) ---
     const themeObjs = [];
-    const activeThemeId = storageManager.getSelectedTheme();
     const saveData = storageManager.data;
 
     const refreshThemes = () => {
       const currentId = storageManager.getSelectedTheme();
-      themeObjs.forEach(({ theme, bg, label }) => {
+      themeObjs.forEach(({ theme, bg, titleTxt, subTxt }) => {
         const unlocked = theme.isUnlocked(saveData);
         const selected = theme.id === currentId;
         bg.clear();
         bg.fillStyle(selected ? 0x3a0ca3 : unlocked ? 0x262b59 : 0x171933, 1);
-        bg.fillRoundedRect(-76, -32, 152, 64, 12);
-        bg.lineStyle(2, selected ? 0x39e5b6 : unlocked ? 0x8ecae6 : 0x4a4e69, selected ? 1 : 0.45);
-        bg.strokeRoundedRect(-76, -32, 152, 64, 12);
-        label.setText(
-          `${theme.icon} ${theme.name}\n${selected ? '✓ Actif' : unlocked ? 'Toucher pour activer' : `🔒 ${theme.unlockDesc}`}`
-        );
+        bg.fillRoundedRect(-164, -34, 328, 68, 16);
+        bg.lineStyle(2.5, selected ? 0x39e5b6 : unlocked ? 0x8ecae6 : 0x4a4e69, selected ? 1 : 0.55);
+        bg.strokeRoundedRect(-164, -34, 328, 68, 16);
+
+        titleTxt.setText(`${theme.icon}  ${theme.name}`);
+        subTxt.setText(selected ? '✓ THÈME ACTIF' : unlocked ? 'Toucher pour activer' : `🔒 ${theme.unlockDesc}`);
+        subTxt.setColor(selected ? '#39e5b6' : unlocked ? '#cbd5ff' : '#ffd166');
       });
     };
 
     THEMES.forEach((theme, idx) => {
-      const col = idx % 2;
-      const row = Math.floor(idx / 2);
-      const tx = col === 0 ? -84 : 84;
-      const ty = 84 + row * 74;
-      const tContainer = this.add.container(tx, ty);
+      const ty = -126 + idx * 82;
+      const tContainer = this.add.container(0, ty);
       const bg = this.add.graphics();
-      const label = this.add
-        .text(0, 0, '', {
-          fontSize: '10px',
+      const titleTxt = this.add
+        .text(-144, -14, '', {
+          fontFamily: FONT_FAMILY,
+          fontSize: '17px',
           fontStyle: 'bold',
           color: '#ffffff',
-          align: 'center',
-          lineSpacing: 5,
         })
-        .setOrigin(0.5);
-      const zone = this.add.zone(0, 0, 152, 64).setInteractive({ useHandCursor: true });
+        .setOrigin(0, 0.5);
+      const subTxt = this.add
+        .text(-144, 14, '', {
+          fontFamily: FONT_FAMILY,
+          fontSize: '13px',
+          fontStyle: 'bold',
+          color: '#cbd5ff',
+        })
+        .setOrigin(0, 0.5);
+      const zone = this.add.zone(0, 0, 328, 68).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', (pointer) => {
         pointer.event?.stopPropagation?.();
         soundFX.playClick();
@@ -1489,10 +1528,11 @@ export default class GameScene extends Phaser.Scene {
         this.renderThemeJar();
         refreshThemes();
       });
-      tContainer.add([bg, label, zone]);
-      themeObjs.push({ theme, tContainer, bg, label });
+      tContainer.add([bg, titleTxt, subTxt, zone]);
+      themeObjs.push({ theme, tContainer, bg, titleTxt, subTxt });
     });
     refreshThemes();
+    themesGroup.add(themeObjs.map((o) => o.tContainer));
 
     const closeModal = () => {
       overlay.destroy();
@@ -1502,21 +1542,9 @@ export default class GameScene extends Phaser.Scene {
       this.matter.world.resume();
     };
 
-    const closeBtn = this.makeModalButton(0, 232, '▶  REPRENDRE', 0x06d6a0, '#0b132b', closeModal);
+    const closeBtn = this.makeModalButton(0, 204, '▶  REPRENDRE', 0x06d6a0, '#0b132b', closeModal);
 
-    card.add([
-      cardBg,
-      title,
-      dailyBox,
-      dailyHdr,
-      dailyDesc,
-      dailyStatus,
-      colTitle,
-      ...colItems,
-      themeTitle,
-      ...themeObjs.map((o) => o.tContainer),
-      closeBtn,
-    ]);
+    card.add([cardBg, tab1.tCont, tab2.tCont, dailyGroup, themesGroup, closeBtn]);
 
     this.tweens.add({
       targets: card,
