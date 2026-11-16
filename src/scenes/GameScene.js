@@ -5,6 +5,7 @@ import { generateGameTextures } from '../utils/textures.js';
 import { soundFX } from '../utils/sound.js';
 import { adManager } from '../managers/AdManager.js';
 import { storageManager } from '../managers/StorageManager.js';
+import { THEMES, getThemeById } from '../config/themes.js';
 
 const GAME_WIDTH = 480;
 const GAME_HEIGHT = 854;
@@ -79,9 +80,8 @@ export default class GameScene extends Phaser.Scene {
   }
 
   drawBackground() {
-    const bg = this.add.graphics();
-    bg.fillGradientStyle(0x13152e, 0x13152e, 0x1e1640, 0x261447, 1);
-    bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    this.bgGraphics = this.add.graphics();
+    this.renderThemeBackground();
 
     // Subtle ambient bokeh circles
     for (let i = 0; i < 10; i++) {
@@ -102,29 +102,20 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  renderThemeBackground() {
+    if (!this.bgGraphics) return;
+    const theme = getThemeById(storageManager.getSelectedTheme());
+    this.bgGraphics.clear();
+    this.bgGraphics.fillGradientStyle(theme.bgTop, theme.bgTop, theme.bgBottom, theme.bgBottom, 1);
+    this.bgGraphics.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  }
+
   createJar() {
     const jarWidth = JAR_RIGHT - JAR_LEFT;
     const jarHeight = JAR_BOTTOM - JAR_TOP;
 
-    // Glass interior
-    const glass = this.add.graphics();
-    glass.fillStyle(0xffffff, 0.06);
-    glass.fillRoundedRect(JAR_LEFT, JAR_TOP, jarWidth, jarHeight, { tl: 6, tr: 6, bl: 22, br: 22 });
-
-    // Glowing glass border
-    glass.lineStyle(4, 0x8ecae6, 0.55);
-    glass.beginPath();
-    glass.moveTo(JAR_LEFT, JAR_TOP);
-    glass.lineTo(JAR_LEFT, JAR_BOTTOM - 16);
-    glass.arc(JAR_LEFT + 16, JAR_BOTTOM - 16, 16, Math.PI, Math.PI * 0.5, true);
-    glass.lineTo(JAR_RIGHT - 16, JAR_BOTTOM);
-    glass.arc(JAR_RIGHT - 16, JAR_BOTTOM - 16, 16, Math.PI * 0.5, 0, true);
-    glass.lineTo(JAR_RIGHT, JAR_TOP);
-    glass.strokePath();
-
-    // Inner specular highlight
-    glass.lineStyle(2, 0xffffff, 0.14);
-    glass.lineBetween(JAR_LEFT + 8, JAR_TOP + 10, JAR_LEFT + 8, JAR_BOTTOM - 28);
+    this.jarGlass = this.add.graphics();
+    this.renderThemeJar();
 
     // Static Matter walls (left, right, bottom)
     const wallOpts = {
@@ -184,6 +175,31 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  renderThemeJar() {
+    if (!this.jarGlass) return;
+    const theme = getThemeById(storageManager.getSelectedTheme());
+    const jarWidth = JAR_RIGHT - JAR_LEFT;
+    const jarHeight = JAR_BOTTOM - JAR_TOP;
+    const glass = this.jarGlass;
+    glass.clear();
+
+    glass.fillStyle(0xffffff, theme.glassAlpha);
+    glass.fillRoundedRect(JAR_LEFT, JAR_TOP, jarWidth, jarHeight, { tl: 6, tr: 6, bl: 22, br: 22 });
+
+    glass.lineStyle(4, theme.jarStroke, 0.65);
+    glass.beginPath();
+    glass.moveTo(JAR_LEFT, JAR_TOP);
+    glass.lineTo(JAR_LEFT, JAR_BOTTOM - 16);
+    glass.arc(JAR_LEFT + 16, JAR_BOTTOM - 16, 16, Math.PI, Math.PI * 0.5, true);
+    glass.lineTo(JAR_RIGHT - 16, JAR_BOTTOM);
+    glass.arc(JAR_RIGHT - 16, JAR_BOTTOM - 16, 16, Math.PI * 0.5, 0, true);
+    glass.lineTo(JAR_RIGHT, JAR_TOP);
+    glass.strokePath();
+
+    glass.lineStyle(2, 0xffffff, 0.14);
+    glass.lineBetween(JAR_LEFT + 8, JAR_TOP + 10, JAR_LEFT + 8, JAR_BOTTOM - 28);
+  }
+
   createUI() {
     // Top Header Bar
     this.add
@@ -196,7 +212,7 @@ export default class GameScene extends Phaser.Scene {
       })
       .setOrigin(0, 0);
 
-    // Glass Icon Buttons (Settings & Sound)
+    // Glass Icon Buttons (Collection/Challenges, Sound, Settings)
     const makeIconBtn = (x, y, iconText, onClick) => {
       const container = this.add.container(x, y).setDepth(12);
       const bg = this.add.graphics();
@@ -216,6 +232,12 @@ export default class GameScene extends Phaser.Scene {
       container.add([bg, txt, zone]);
       return { container, txt };
     };
+
+    makeIconBtn(GAME_WIDTH - 142, 40, '🏆', () => {
+      if (!this.isGameOver) {
+        this.openRetentionModal();
+      }
+    });
 
     const muteObj = makeIconBtn(GAME_WIDTH - 92, 40, soundFX.muted ? '🔇' : '🔊', (txt) => {
       const muted = soundFX.toggleMute();
@@ -895,6 +917,7 @@ export default class GameScene extends Phaser.Scene {
     this.dangerBarFill.setVisible(false);
 
     storageManager.incrementGamesPlayed();
+    storageManager.recordDailyProgress({ score: this.score, gameEnded: true });
     soundFX.playGameOver();
     this.cameras.main.shake(300, 0.015);
 
@@ -1219,6 +1242,219 @@ export default class GameScene extends Phaser.Scene {
           });
         });
       },
+    });
+  }
+
+  showDailyBanner() {
+    const banner = this.add
+      .text(GAME_WIDTH / 2, JAR_TOP + 86, '🏆 DÉFI DU JOUR RÉUSSI !', {
+        fontSize: '15px',
+        fontStyle: '900',
+        color: '#0b132b',
+        backgroundColor: '#ffd166',
+        padding: { x: 14, y: 7 },
+      })
+      .setOrigin(0.5)
+      .setDepth(17)
+      .setScale(0.6)
+      .setAlpha(0);
+
+    this.spawnConfetti(GAME_WIDTH / 2, JAR_TOP + 90, 26);
+    this.tweens.add({
+      targets: banner,
+      scale: 1,
+      alpha: 1,
+      duration: 220,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.time.delayedCall(1600, () => {
+          this.tweens.add({
+            targets: banner,
+            y: banner.y - 24,
+            alpha: 0,
+            duration: 280,
+            onComplete: () => banner.destroy(),
+          });
+        });
+      },
+    });
+  }
+
+  openRetentionModal() {
+    if (this.settingsOpen || this.isGameOver) return;
+    this.settingsOpen = true;
+    this.canDrop = false;
+    this.matter.world.pause();
+
+    const overlay = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.78)
+      .setDepth(30)
+      .setInteractive();
+
+    const card = this.add
+      .container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+      .setDepth(35)
+      .setScale(0.75)
+      .setAlpha(0);
+
+    const cardBg = this.add.graphics();
+    cardBg.fillStyle(0x1b1e3f, 1);
+    cardBg.fillRoundedRect(-190, -285, 380, 570, 24);
+    cardBg.lineStyle(2.5, 0xffd166, 0.75);
+    cardBg.strokeRoundedRect(-190, -285, 380, 570, 24);
+
+    const title = this.add
+      .text(0, -250, '🏆 DÉFIS & COLLECTION', {
+        fontSize: '21px',
+        fontStyle: '900',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5);
+
+    // 1. Daily Challenge Box
+    const daily = storageManager.getDailyChallenge();
+    const dailyBox = this.add.graphics();
+    dailyBox.fillStyle(0x262b59, 1);
+    dailyBox.fillRoundedRect(-168, -218, 336, 86, 14);
+    dailyBox.lineStyle(1.5, daily.completed ? 0x06d6a0 : 0x8ecae6, 0.65);
+    dailyBox.strokeRoundedRect(-168, -218, 336, 86, 14);
+
+    const dailyHdr = this.add
+      .text(-152, -206, `DÉFI DU JOUR   •   🔥 Série : ${daily.streak} j`, {
+        fontSize: '12px',
+        fontStyle: '900',
+        color: '#ffd166',
+      });
+    const dailyDesc = this.add.text(-152, -184, daily.title, {
+      fontSize: '14px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+    });
+    const dailyStatus = this.add.text(
+      -152,
+      -156,
+      daily.completed ? '✅ TERMINÉ AUJOURD’HUI !' : '⏳ En cours — joue pour le valider',
+      {
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: daily.completed ? '#06d6a0' : '#a5b4fc',
+      }
+    );
+
+    // 2. Fruit Collection (11 fruits)
+    const maxTier = storageManager.getMaxTierReached();
+    const colTitle = this.add
+      .text(0, -112, `COLLECTION DE FRUITS (${Math.min(maxTier + 1, FRUITS.length)} / ${FRUITS.length})`, {
+        fontSize: '13px',
+        fontStyle: '900',
+        color: '#a5b4fc',
+      })
+      .setOrigin(0.5);
+
+    const colItems = [];
+    FRUITS.forEach((f, idx) => {
+      const col = idx % 6;
+      const row = Math.floor(idx / 6);
+      const cx = (row === 0 ? -135 : -108) + col * 54;
+      const cy = -72 + row * 48;
+      const unlocked = idx <= maxTier;
+      const icon = this.add.image(cx, cy, `fruit_${f.tier}`).setDisplaySize(32, 32).setAlpha(unlocked ? 1 : 0.22);
+      colItems.push(icon);
+    });
+
+    // 3. Themes (2x2 grid)
+    const themeTitle = this.add
+      .text(0, 32, 'THÈMES VISUELS', {
+        fontSize: '13px',
+        fontStyle: '900',
+        color: '#a5b4fc',
+      })
+      .setOrigin(0.5);
+
+    const themeObjs = [];
+    const activeThemeId = storageManager.getSelectedTheme();
+    const saveData = storageManager.data;
+
+    const refreshThemes = () => {
+      const currentId = storageManager.getSelectedTheme();
+      themeObjs.forEach(({ theme, bg, label }) => {
+        const unlocked = theme.isUnlocked(saveData);
+        const selected = theme.id === currentId;
+        bg.clear();
+        bg.fillStyle(selected ? 0x3a0ca3 : unlocked ? 0x262b59 : 0x171933, 1);
+        bg.fillRoundedRect(-76, -32, 152, 64, 12);
+        bg.lineStyle(2, selected ? 0x39e5b6 : unlocked ? 0x8ecae6 : 0x4a4e69, selected ? 1 : 0.45);
+        bg.strokeRoundedRect(-76, -32, 152, 64, 12);
+        label.setText(
+          `${theme.icon} ${theme.name}\n${selected ? '✓ Actif' : unlocked ? 'Toucher pour activer' : `🔒 ${theme.unlockDesc}`}`
+        );
+      });
+    };
+
+    THEMES.forEach((theme, idx) => {
+      const col = idx % 2;
+      const row = Math.floor(idx / 2);
+      const tx = col === 0 ? -84 : 84;
+      const ty = 84 + row * 74;
+      const tContainer = this.add.container(tx, ty);
+      const bg = this.add.graphics();
+      const label = this.add
+        .text(0, 0, '', {
+          fontSize: '10px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          align: 'center',
+          lineSpacing: 5,
+        })
+        .setOrigin(0.5);
+      const zone = this.add.zone(0, 0, 152, 64).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', (pointer) => {
+        pointer.event?.stopPropagation?.();
+        soundFX.playClick();
+        if (!theme.isUnlocked(saveData)) {
+          this.showToast(`🔒 Déblocage : ${theme.unlockDesc}`);
+          return;
+        }
+        storageManager.setSelectedTheme(theme.id);
+        this.renderThemeBackground();
+        this.renderThemeJar();
+        refreshThemes();
+      });
+      tContainer.add([bg, label, zone]);
+      themeObjs.push({ theme, tContainer, bg, label });
+    });
+    refreshThemes();
+
+    const closeModal = () => {
+      overlay.destroy();
+      card.destroy();
+      this.settingsOpen = false;
+      this.canDrop = true;
+      this.matter.world.resume();
+    };
+
+    const closeBtn = this.makeModalButton(0, 232, '▶  REPRENDRE', 0x06d6a0, '#0b132b', closeModal);
+
+    card.add([
+      cardBg,
+      title,
+      dailyBox,
+      dailyHdr,
+      dailyDesc,
+      dailyStatus,
+      colTitle,
+      ...colItems,
+      themeTitle,
+      ...themeObjs.map((o) => o.tContainer),
+      closeBtn,
+    ]);
+
+    this.tweens.add({
+      targets: card,
+      scale: 1,
+      alpha: 1,
+      duration: 200,
+      ease: 'Back.easeOut',
     });
   }
 }
