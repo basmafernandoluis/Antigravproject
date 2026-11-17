@@ -1,16 +1,57 @@
-// Relaxed 4-bar Cmaj7 -> Am7 -> Fmaj7 -> G6 casual marimba loop (frequencies in Hz)
+// Relaxed 16-bar (~43s) multi-section casual marimba & warm pad loop (frequencies in Hz)
+// Sections: A (Cmaj7-Am7-Fmaj7-G6) -> A' (Em7-Am7-Dm7-G6) -> B (Fmaj7-G6-Em7-Am7) -> C (Dm7-G6-Cmaj7-Cmaj9)
 const BGM_BASS = [
-  130.81, 0, 0, 0, 196.0, 0, 0, 0, // C3 -> G3
-  110.0, 0, 0, 0, 164.81, 0, 0, 0, // A2 -> E3
-  87.31, 0, 0, 0, 130.81, 0, 0, 0, // F2 -> C3
-  98.0, 0, 0, 0, 146.83, 0, 0, 0, // G2 -> D3
+  // Section A (bars 1-4)
+  130.81, 0, 0, 0, 196.0, 0, 0, 0,
+  110.0, 0, 0, 0, 164.81, 0, 0, 0,
+  87.31, 0, 0, 0, 130.81, 0, 0, 0,
+  98.0, 0, 0, 0, 146.83, 0, 0, 0,
+  // Section A' (bars 5-8)
+  164.81, 0, 0, 0, 246.94, 0, 0, 0,
+  110.0, 0, 0, 0, 164.81, 0, 0, 0,
+  146.83, 0, 0, 0, 220.0, 0, 0, 0,
+  98.0, 0, 0, 0, 146.83, 0, 0, 0,
+  // Section B (bars 9-12, dreamy bridge)
+  87.31, 0, 0, 0, 130.81, 0, 174.61, 0,
+  98.0, 0, 0, 0, 146.83, 0, 196.0, 0,
+  164.81, 0, 0, 0, 196.0, 0, 246.94, 0,
+  110.0, 0, 0, 0, 164.81, 0, 0, 0,
+  // Section C (bars 13-16, calm resolution with breathing room)
+  146.83, 0, 0, 0, 220.0, 0, 0, 0,
+  98.0, 0, 0, 0, 146.83, 0, 0, 0,
+  130.81, 0, 0, 0, 196.0, 0, 0, 0,
+  130.81, 0, 0, 0, 0, 0, 0, 0,
 ];
 
 const BGM_MELODY = [
-  523.25, 0, 659.25, 783.99, 0, 659.25, 587.33, 0, // C5 E5 G5 E5 D5
-  440.0, 0, 523.25, 659.25, 0, 523.25, 493.88, 0, // A4 C5 E5 C5 B4
-  349.23, 0, 440.0, 523.25, 0, 659.25, 523.25, 0, // F4 A4 C5 E5 C5
-  392.0, 0, 493.88, 587.33, 0, 659.25, 587.33, 0, // G4 B4 D5 E5 D5
+  // Section A
+  523.25, 0, 659.25, 783.99, 0, 659.25, 587.33, 0,
+  440.0, 0, 523.25, 659.25, 0, 523.25, 493.88, 0,
+  349.23, 0, 440.0, 523.25, 0, 659.25, 523.25, 0,
+  392.0, 0, 493.88, 587.33, 0, 523.25, 493.88, 0,
+  // Section A'
+  659.25, 0, 783.99, 987.77, 0, 783.99, 659.25, 0,
+  523.25, 0, 659.25, 880.0, 0, 659.25, 587.33, 0,
+  587.33, 0, 659.25, 698.46, 0, 659.25, 523.25, 0,
+  493.88, 0, 587.33, 783.99, 0, 0, 587.33, 0,
+  // Section B (sparse, gentle)
+  698.46, 0, 0, 659.25, 0, 523.25, 0, 440.0,
+  587.33, 0, 0, 523.25, 0, 493.88, 0, 392.0,
+  659.25, 0, 783.99, 0, 659.25, 0, 493.88, 0,
+  523.25, 0, 0, 440.0, 0, 0, 0, 0,
+  // Section C (resolution + space)
+  587.33, 0, 698.46, 880.0, 0, 783.99, 659.25, 0,
+  587.33, 0, 493.88, 587.33, 0, 659.25, 587.33, 0,
+  523.25, 0, 659.25, 783.99, 0, 587.33, 523.25, 0,
+  523.25, 0, 0, 0, 0, 0, 0, 0,
+];
+
+// Soft warm pad chord roots played gently at the start of each bar (every 8 steps)
+const BGM_PAD = [
+  261.63, 220.0, 174.61, 196.0,
+  329.63, 220.0, 293.66, 196.0,
+  174.61, 196.0, 329.63, 220.0,
+  293.66, 196.0, 261.63, 261.63,
 ];
 
 class SoundFX {
@@ -46,7 +87,7 @@ class SoundFX {
     }
     if (this.ctx && !this.musicGain) {
       this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = this.musicEnabled && !this.musicPaused ? 0.55 : 0;
+      this.musicGain.gain.value = this.musicEnabled && !this.musicPaused ? 0.5 : 0;
       this.musicGain.connect(this.ctx.destination);
     }
     if (this.ctx && this.musicEnabled && !this.musicPaused && !this.musicTimer) {
@@ -70,7 +111,7 @@ class SoundFX {
     this.musicEnabled = Boolean(enabled);
     if (this.musicGain && this.ctx) {
       this.musicGain.gain.setTargetAtTime(
-        this.musicEnabled && !this.musicPaused ? 0.55 : 0,
+        this.musicEnabled && !this.musicPaused ? 0.5 : 0,
         this.ctx.currentTime,
         0.05
       );
@@ -98,7 +139,7 @@ class SoundFX {
     this.muted = this.wasSfxMutedBeforeAd ?? false;
     this.musicPaused = false;
     if (this.musicGain && this.ctx) {
-      this.musicGain.gain.setTargetAtTime(this.musicEnabled ? 0.55 : 0, this.ctx.currentTime, 0.05);
+      this.musicGain.gain.setTargetAtTime(this.musicEnabled ? 0.5 : 0, this.ctx.currentTime, 0.05);
     }
     if (this.musicEnabled) {
       this.startMusicLoop();
@@ -110,13 +151,35 @@ class SoundFX {
     if (!this.ctx || !this.musicGain) return;
     if (typeof document !== 'undefined' && document.hidden) return;
 
-    const stepMs = 320; // ~93 BPM eighth notes
+    const stepMs = 340; // ~88 BPM relaxed eighth notes (128 steps = ~43.5s per full cycle)
     const tick = () => {
       if (!this.musicEnabled || this.musicPaused || !this.ctx || this.ctx.state !== 'running') return;
-      const idx = this.musicStep % BGM_MELODY.length;
+      const len = BGM_MELODY.length;
+      const idx = this.musicStep % len;
+      const cycle = Math.floor(this.musicStep / len);
       this.musicStep += 1;
 
       const now = this.ctx.currentTime;
+
+      // 1. Warm sustained pad on bar downbeats (every 8 steps)
+      if (idx % 8 === 0) {
+        const padFreq = BGM_PAD[Math.floor(idx / 8) % BGM_PAD.length];
+        if (padFreq > 0) {
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(padFreq, now);
+          g.gain.setValueAtTime(0.001, now);
+          g.gain.linearRampToValueAtTime(0.022, now + 0.35);
+          g.gain.exponentialRampToValueAtTime(0.0008, now + 2.4);
+          osc.connect(g);
+          g.connect(this.musicGain);
+          osc.start(now);
+          osc.stop(now + 2.45);
+        }
+      }
+
+      // 2. Soft bass pulse
       const bassFreq = BGM_BASS[idx];
       if (bassFreq > 0) {
         const osc = this.ctx.createOscillator();
@@ -124,27 +187,36 @@ class SoundFX {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(bassFreq, now);
         g.gain.setValueAtTime(0.001, now);
-        g.gain.linearRampToValueAtTime(0.045, now + 0.03);
-        g.gain.exponentialRampToValueAtTime(0.0008, now + 0.58);
+        g.gain.linearRampToValueAtTime(0.036, now + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.0008, now + 0.65);
         osc.connect(g);
         g.connect(this.musicGain);
         osc.start(now);
-        osc.stop(now + 0.6);
+        osc.stop(now + 0.68);
       }
 
-      const melFreq = BGM_MELODY[idx];
+      // 3. Gentle marimba melody with subtle cycle-based variation
+      let melFreq = BGM_MELODY[idx];
+      if (melFreq > 0) {
+        // Subtle variation on subsequent passes so it stays fresh
+        if (cycle % 2 === 1 && idx % 16 === 6) {
+          melFreq = 0; // Leave extra breathing room on odd cycles
+        } else if (cycle % 3 === 2 && idx % 16 === 10) {
+          melFreq *= 1.5; // Occasional gentle fifth shimmer
+        }
+      }
       if (melFreq > 0) {
         const osc = this.ctx.createOscillator();
         const g = this.ctx.createGain();
-        osc.type = 'triangle';
+        osc.type = 'sine';
         osc.frequency.setValueAtTime(melFreq, now);
         g.gain.setValueAtTime(0.001, now);
-        g.gain.linearRampToValueAtTime(0.032, now + 0.015);
-        g.gain.exponentialRampToValueAtTime(0.0008, now + 0.28);
+        g.gain.linearRampToValueAtTime(0.026, now + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0008, now + 0.36);
         osc.connect(g);
         g.connect(this.musicGain);
         osc.start(now);
-        osc.stop(now + 0.3);
+        osc.stop(now + 0.38);
       }
     };
 
