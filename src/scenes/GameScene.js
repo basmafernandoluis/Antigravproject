@@ -91,26 +91,50 @@ export default class GameScene extends Phaser.Scene {
     this.nextTier = this.pickNextSpawnTier();
     this.prepareNextDrop();
 
-    // First-time micro-tutorial
-    if (storageManager.getGamesPlayed() === 0) {
-      this.tutorialHint = this.add
-        .text(GAME_WIDTH / 2, JAR_TOP + 120, t('tutorialHint'), {
+    // First-time visual micro-tutorial (non-blocking, auto-dismisses on first drop)
+    if (!storageManager.isTutorialSeen()) {
+      const tut = this.add.container(GAME_WIDTH / 2, JAR_TOP + 135).setDepth(14);
+      const tutBg = this.add.graphics();
+      tutBg.fillStyle(0x090a1a, 0.86);
+      tutBg.fillRoundedRect(-146, -48, 292, 96, 20);
+      tutBg.lineStyle(2.5, 0x06d6a0, 0.9);
+      tutBg.strokeRoundedRect(-146, -48, 292, 96, 20);
+
+      const demoTxt = this.add
+        .text(0, -24, '🍒  +  🍒  ➔  🍓', {
           fontFamily: FONT_FAMILY,
-          fontSize: '16px',
+          fontSize: '18px',
+          fontStyle: 'bold',
+          color: '#ffd166',
+        })
+        .setOrigin(0.5);
+
+      const hintTxt = this.add
+        .text(0, 4, t('tutorialHint'), {
+          fontFamily: FONT_FAMILY,
+          fontSize: '14px',
           fontStyle: 'bold',
           color: '#ffffff',
-          align: 'center',
-          backgroundColor: '#1b1e3fcc',
-          padding: { x: 16, y: 10 },
         })
-        .setOrigin(0.5)
-        .setDepth(14);
+        .setOrigin(0.5);
+
+      const handTxt = this.add.text(-42, 30, '👆', { fontSize: '24px' }).setOrigin(0.5);
+      tut.add([tutBg, demoTxt, hintTxt, handTxt]);
+
       this.tweens.add({
-        targets: this.tutorialHint,
-        alpha: 0.65,
-        duration: 700,
+        targets: handTxt,
+        x: 42,
+        duration: 900,
         yoyo: true,
         repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+      this.tutorialHint = tut;
+    } else if (storageManager.getDailyGiftState().canClaim) {
+      this.time.delayedCall(450, () => {
+        if (!this.isGameOver && !this.settingsOpen && !this.retentionOpen && !this.dailyGiftOpen) {
+          this.openDailyGiftModal();
+        }
       });
     }
   }
@@ -336,6 +360,15 @@ export default class GameScene extends Phaser.Scene {
       container.add([bg, txt, zone]);
       return { container, txt };
     };
+
+    const giftObj = makeIconBtn(GAME_WIDTH - 192, 40, '🎁', 0xff5d8f, 0xb5179e, () => {
+      if (!this.isGameOver) {
+        this.openDailyGiftModal();
+      }
+    });
+    this.giftBadgeDot = this.add.circle(16, -16, 6, 0xff3b5c, 1).setStrokeStyle(1.5, 0xffffff, 1);
+    giftObj.container.add(this.giftBadgeDot);
+    this.giftBadgeDot.setVisible(storageManager.getDailyGiftState().canClaim);
 
     const trophyObj = makeIconBtn(GAME_WIDTH - 142, 40, '🏆', 0x06d6a0, 0x048a66, () => {
       if (!this.isGameOver) {
@@ -1070,6 +1103,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.tutorialHint) {
       const hint = this.tutorialHint;
       this.tutorialHint = null;
+      storageManager.setTutorialSeen(true);
       this.tweens.add({
         targets: hint,
         alpha: 0,
@@ -2480,6 +2514,128 @@ export default class GameScene extends Phaser.Scene {
     const resumeBtn = this.makeModalButton(72, 106, `▶ ${t('close')}`, 0x06d6a0, '#0b132b', closeModal, 134, 46);
 
     card.add([musicTile, sfxTile, hapticsTile, modeBtn, langBtn, privacyBtn, resumeBtn]);
+
+    this.tweens.add({
+      targets: card,
+      scale: 1,
+      alpha: 1,
+      duration: 200,
+      ease: 'Back.easeOut',
+    });
+  }
+
+  openDailyGiftModal() {
+    if (this.dailyGiftOpen || this.isGameOver || this.settingsOpen || this.retentionOpen) return;
+    this.dailyGiftOpen = true;
+    this.canDrop = false;
+    this.matter.world.pause();
+
+    const overlay = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.72)
+      .setDepth(30)
+      .setInteractive();
+
+    let card = null;
+    const closeModal = () => {
+      if (!this.dailyGiftOpen) return;
+      overlay.destroy();
+      card?.destroy();
+      this.dailyGiftOpen = false;
+      this.canDrop = true;
+      this.matter.world.resume();
+    };
+
+    overlay.on('pointerdown', closeModal);
+
+    card = this.createHybridModalCard(354, 420, 0xff5d8f, `🎁 ${t('dailyGiftTitle')}`, {
+      onClose: closeModal,
+      ribbonColor: 0xb5179e,
+      titleColor: '#ffffff',
+    });
+
+    const sub = this.add
+      .text(0, -138, t('dailyGiftSub'), {
+        fontFamily: FONT_FAMILY,
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#cbd5ff',
+      })
+      .setOrigin(0.5);
+    card.add(sub);
+
+    const state = storageManager.getDailyGiftState();
+    const claimedCount = state.canClaim ? state.streakDay : (state.streakDay === 0 ? 7 : state.streakDay);
+
+    state.rewards.forEach((rw, idx) => {
+      const isDay7 = idx === 6;
+      const col = idx % 3;
+      const row = Math.floor(idx / 3);
+      const x = isDay7 ? 0 : (col - 1) * 96;
+      const y = isDay7 ? 80 : -72 + row * 76;
+      const w = isDay7 ? 280 : 88;
+      const h = isDay7 ? 56 : 66;
+
+      const isClaimed = idx < claimedCount;
+      const isToday = state.canClaim && idx === state.streakDay;
+
+      const tile = this.add.graphics();
+      tile.fillStyle(0x000000, 0.32);
+      tile.fillRoundedRect(x - w / 2, y - h / 2 + 4, w, h, 14);
+      const fillCol = isToday ? 0x06d6a0 : isClaimed ? 0x1b4332 : 0x252850;
+      tile.fillStyle(fillCol, 1);
+      tile.fillRoundedRect(x - w / 2, y - h / 2, w, h, 14);
+      tile.lineStyle(isToday ? 2.5 : 1.5, isToday ? 0xffd166 : isClaimed ? 0x52b788 : 0x5c629c, 0.9);
+      tile.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 14);
+
+      const dayLabel = t('dailyGiftDay', { d: idx + 1 });
+      const dayTxt = this.add
+        .text(isDay7 ? x - 110 : x, isDay7 ? y : y - 19, isClaimed ? `✓ ${dayLabel}` : dayLabel, {
+          fontFamily: FONT_FAMILY,
+          fontSize: isDay7 ? '13px' : '11px',
+          fontStyle: 'bold',
+          color: isToday ? '#0b132b' : isClaimed ? '#95d5b2' : '#ffd166',
+        })
+        .setOrigin(0.5);
+
+      const rwTxt = this.add
+        .text(isDay7 ? x + 22 : x, isDay7 ? y : y + 6, `🎁 ×${rw.tokens}  +${rw.xp}XP`, {
+          fontFamily: FONT_FAMILY,
+          fontSize: isDay7 ? '14px' : '10px',
+          fontStyle: 'bold',
+          color: isToday ? '#0b132b' : '#ffffff',
+        })
+        .setOrigin(0.5);
+
+      card.add([tile, dayTxt, rwTxt]);
+    });
+
+    const ctaBtn = state.canClaim
+      ? this.makeModalButton(
+          0,
+          156,
+          `🎁 ${t('dailyGiftClaim')}`,
+          0x06d6a0,
+          '#0b132b',
+          () => {
+            const res = storageManager.claimDailyGift();
+            if (res) {
+              soundFX.playLevelWin();
+              haptics.levelWin();
+              this.spawnConfetti(GAME_WIDTH / 2, GAME_HEIGHT / 2, 28);
+              this.giftBadgeDot?.setVisible(false);
+              this.refreshBoosterBadges?.();
+              this.showToast(
+                t('dailyGiftClaimed', { tokens: res.reward.tokens, xp: res.reward.xp })
+              );
+            }
+            closeModal();
+          },
+          240,
+          48
+        )
+      : this.makeModalButton(0, 156, `▶ ${t('close')}`, 0x4361ee, '#ffffff', closeModal, 200, 46);
+
+    card.add(ctaBtn);
 
     this.tweens.add({
       targets: card,

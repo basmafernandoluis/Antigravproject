@@ -331,6 +331,12 @@ DICT.fr.adBadge = 'PUB';
 DICT.fr.musicShort = 'MUSIQUE';
 DICT.fr.sfxShort = 'EFFETS';
 DICT.fr.vibShort = 'VIBR.';
+DICT.fr.tutorialHint = 'Glisse et lâche pour fusionner !';
+DICT.fr.dailyGiftTitle = 'CADEAU DU JOUR';
+DICT.fr.dailyGiftSub = 'Reviens chaque jour pour plus de jetons !';
+DICT.fr.dailyGiftDay = 'J{d}';
+DICT.fr.dailyGiftClaim = 'RÉCLAMER';
+DICT.fr.dailyGiftClaimed = '🎁 +{tokens} jeton(s) & +{xp} XP !';
 
 DICT.en.activeTheme = '✓ ACTIVE';
 DICT.en.tapToUse = 'Tap to equip';
@@ -341,6 +347,12 @@ DICT.en.adBadge = 'AD';
 DICT.en.musicShort = 'MUSIC';
 DICT.en.sfxShort = 'SFX';
 DICT.en.vibShort = 'HAPTICS';
+DICT.en.tutorialHint = 'Drag & drop to merge fruits!';
+DICT.en.dailyGiftTitle = 'DAILY GIFT';
+DICT.en.dailyGiftSub = 'Come back daily for bigger rewards!';
+DICT.en.dailyGiftDay = 'D{d}';
+DICT.en.dailyGiftClaim = 'CLAIM';
+DICT.en.dailyGiftClaimed = '🎁 +{tokens} token(s) & +{xp} XP!';
 
 DICT.de.activeTheme = '✓ AKTIV';
 DICT.de.tapToUse = 'Tippen zum Aktivieren';
@@ -351,6 +363,12 @@ DICT.de.adBadge = 'WERB.';
 DICT.de.musicShort = 'MUSIK';
 DICT.de.sfxShort = 'TON';
 DICT.de.vibShort = 'VIBR.';
+DICT.de.tutorialHint = 'Ziehen & fallen lassen!';
+DICT.de.dailyGiftTitle = 'TAGESGESCHENK';
+DICT.de.dailyGiftSub = 'Komm täglich für mehr Belohnungen!';
+DICT.de.dailyGiftDay = 'T{d}';
+DICT.de.dailyGiftClaim = 'ABHOLEN';
+DICT.de.dailyGiftClaimed = '🎁 +{tokens} Token & +{xp} XP!';
 
 DICT.ja.activeTheme = '✓ 使用中';
 DICT.ja.tapToUse = 'タップで変更';
@@ -361,12 +379,24 @@ DICT.ja.adBadge = '広告';
 DICT.ja.musicShort = 'おんがく';
 DICT.ja.sfxShort = 'こうかおん';
 DICT.ja.vibShort = 'しんどう';
+DICT.ja.tutorialHint = 'スワイプして落として合体！';
+DICT.ja.dailyGiftTitle = 'デイリーギフト';
+DICT.ja.dailyGiftSub = '毎日ログインで豪華報酬！';
+DICT.ja.dailyGiftDay = '{d}日目';
+DICT.ja.dailyGiftClaim = 'うけとる';
+DICT.ja.dailyGiftClaimed = '🎁 +{tokens} トークン & +{xp} XP！';
 
 DICT.ar.quitBtn = '🚪  خروج';
 DICT.ar.adBadge = 'إعلان';
 DICT.ar.musicShort = 'موسيقى';
 DICT.ar.sfxShort = 'مؤثرات';
 DICT.ar.vibShort = 'اهتزاز';
+DICT.ar.tutorialHint = 'اسحب وأفلت للدمج!';
+DICT.ar.dailyGiftTitle = 'هدية اليوم';
+DICT.ar.dailyGiftSub = 'عد يومياً لمكافآت أكبر!';
+DICT.ar.dailyGiftDay = 'ي{d}';
+DICT.ar.dailyGiftClaim = 'استلام';
+DICT.ar.dailyGiftClaimed = '🎁 +{tokens} عملة و +{xp} XP!';
 
 export function detectSystemLang() {
   if (typeof navigator === 'undefined') return 'en';

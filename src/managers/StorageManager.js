@@ -25,6 +25,11 @@ const DEFAULT_DATA = {
   seasonPoints: 0,
   claimedCareerQuests: [],
   bestComboEver: 0,
+  tutorialSeen: false,
+  dailyGift: {
+    lastClaimDate: '',
+    streakDay: 0,
+  },
   dailyChallenge: {
     date: '',
     completed: false,
@@ -35,6 +40,16 @@ const DEFAULT_DATA = {
     claimedIds: [],
   },
 };
+
+const DAILY_GIFT_REWARDS = [
+  { tokens: 1, xp: 50, season: 50 },
+  { tokens: 1, xp: 80, season: 80 },
+  { tokens: 2, xp: 120, season: 100 },
+  { tokens: 2, xp: 150, season: 120 },
+  { tokens: 3, xp: 200, season: 160 },
+  { tokens: 3, xp: 250, season: 200 },
+  { tokens: 5, xp: 400, season: 350 },
+];
 
 const RANKS = [
   { minLvl: 11, label: '🍉 Légende Pastèque' },
@@ -60,6 +75,10 @@ class StorageManager {
         return {
           ...DEFAULT_DATA,
           ...parsed,
+          dailyGift: {
+            ...DEFAULT_DATA.dailyGift,
+            ...(parsed.dailyGift || {}),
+          },
           dailyChallenge: {
             ...DEFAULT_DATA.dailyChallenge,
             ...(parsed.dailyChallenge || {}),
@@ -438,6 +457,58 @@ class StorageManager {
       return true;
     }
     return false;
+  }
+
+  isTutorialSeen() {
+    return Boolean(this.data.tutorialSeen);
+  }
+
+  setTutorialSeen(val = true) {
+    this.data.tutorialSeen = Boolean(val);
+    this.save();
+  }
+
+  getDailyGiftState() {
+    const today = this._todayStr();
+    const yesterday = this._yesterdayStr();
+    const dg = this.data.dailyGift || { lastClaimDate: '', streakDay: 0 };
+    let streakDay = dg.streakDay || 0;
+
+    // Reset streak if last claim was older than yesterday (and not today)
+    if (dg.lastClaimDate && dg.lastClaimDate !== today && dg.lastClaimDate !== yesterday) {
+      streakDay = 0;
+    }
+
+    const canClaim = dg.lastClaimDate !== today;
+    return {
+      canClaim,
+      streakDay, // 0..6
+      currentDay: streakDay + 1, // 1..7
+      rewards: DAILY_GIFT_REWARDS,
+    };
+  }
+
+  claimDailyGift() {
+    const state = this.getDailyGiftState();
+    if (!state.canClaim) return null;
+
+    const reward = DAILY_GIFT_REWARDS[state.streakDay] || DAILY_GIFT_REWARDS[0];
+    const today = this._todayStr();
+
+    this.data.dailyGift = {
+      lastClaimDate: today,
+      streakDay: (state.streakDay + 1) % DAILY_GIFT_REWARDS.length,
+    };
+    this.data.freeTokens = (this.data.freeTokens || 0) + reward.tokens;
+    this.data.seasonPoints = (this.data.seasonPoints || 0) + reward.season;
+    this.save();
+
+    const rankRes = this.addXp(reward.xp);
+    return {
+      day: state.currentDay,
+      reward,
+      rankRes,
+    };
   }
 }
 
