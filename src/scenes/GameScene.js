@@ -68,6 +68,7 @@ export default class GameScene extends Phaser.Scene {
     this.pinMode = false;
     this.continuesUsed = 0;
     this.scoreDoubled = false;
+    this.isRainbowNext = false;
     this.comboCount = 0;
     this.lastMergeTime = 0;
     this.dangerTimer = 0;
@@ -772,6 +773,96 @@ export default class GameScene extends Phaser.Scene {
       ctx.restore();
       tex.refresh();
     }
+
+    if (!this.textures.exists('booster_rainbow')) {
+      const tex = this.textures.createCanvas('booster_rainbow', 140, 140);
+      const ctx = tex.getContext();
+      ctx.clearRect(0, 0, 140, 140);
+
+      // Rainbow halo
+      const glow = ctx.createRadialGradient(70, 70, 12, 70, 70, 64);
+      glow.addColorStop(0, 'rgba(255, 255, 255, 0.75)');
+      glow.addColorStop(1, 'rgba(155, 246, 255, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(70, 70, 64, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Prismatic orb
+      const grad = ctx.createLinearGradient(25, 25, 115, 115);
+      grad.addColorStop(0, '#ff4d6d');
+      grad.addColorStop(0.25, '#ffd166');
+      grad.addColorStop(0.5, '#06d6a0');
+      grad.addColorStop(0.75, '#4cc9f0');
+      grad.addColorStop(1, '#9d4edd');
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(70, 72, 38, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Glossy highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath();
+      ctx.ellipse(56, 54, 14, 7, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Center 4-point sparkle
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const r = i % 2 === 0 ? 18 : 6;
+        const a = (i * Math.PI) / 4;
+        const px = 70 + Math.cos(a) * r;
+        const py = 72 + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      tex.refresh();
+    }
+
+    if (!this.textures.exists('fruit_rainbow')) {
+      const tex = this.textures.createCanvas('fruit_rainbow', 64, 64);
+      const ctx = tex.getContext();
+      ctx.clearRect(0, 0, 64, 64);
+
+      const grad = ctx.createLinearGradient(8, 8, 56, 56);
+      grad.addColorStop(0, '#ff4d6d');
+      grad.addColorStop(0.25, '#ffd166');
+      grad.addColorStop(0.5, '#06d6a0');
+      grad.addColorStop(0.75, '#4cc9f0');
+      grad.addColorStop(1, '#9d4edd');
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(32, 32, 24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Cute kawaii eyes + shine
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.ellipse(23, 21, 7, 3.5, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#1b1e3f';
+      ctx.beginPath();
+      ctx.arc(24, 33, 2.8, 0, Math.PI * 2);
+      ctx.arc(40, 33, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#1b1e3f';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(32, 36, 4.5, 0.15, Math.PI - 0.15);
+      ctx.stroke();
+      tex.refresh();
+    }
   }
 
   createBoosterButtons() {
@@ -779,35 +870,35 @@ export default class GameScene extends Phaser.Scene {
 
     const makeIconTile = (x, y, textureKey, fillColor, lipColor, onClick) => {
       const container = this.add.container(x, y).setDepth(12);
-      const w = 68;
-      const h = 62;
+      const w = 50;
+      const h = 58;
       const bg = this.add.graphics();
       // Drop shadow
       bg.fillStyle(0x000000, 0.35);
-      bg.fillRoundedRect(-w / 2, -h / 2 + 6, w, h, 20);
+      bg.fillRoundedRect(-w / 2, -h / 2 + 6, w, h, 16);
       // 3D bottom lip
       bg.fillStyle(lipColor, 1);
-      bg.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 20);
+      bg.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 16);
       // Main candy tile body
       bg.fillStyle(fillColor, 1);
-      bg.fillRoundedRect(-w / 2, -h / 2, w, h, 20);
+      bg.fillRoundedRect(-w / 2, -h / 2, w, h, 16);
       // Glossy top cushion highlight
       bg.fillStyle(0xffffff, 0.28);
-      bg.fillRoundedRect(-w / 2 + 7, -h / 2 + 3, w - 14, 16, 8);
+      bg.fillRoundedRect(-w / 2 + 5, -h / 2 + 3, w - 10, 14, 7);
       // Crisp cream-white border
-      bg.lineStyle(2.5, 0xffffff, 0.85);
-      bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 20);
+      bg.lineStyle(2, 0xffffff, 0.85);
+      bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 16);
 
-      const iconImg = this.add.image(0, -5, textureKey).setDisplaySize(48, 48);
+      const iconImg = this.add.image(0, -5, textureKey).setDisplaySize(38, 38);
 
       // Overlapping bottom pill badge
-      const badgeGroup = this.add.container(0, 26);
+      const badgeGroup = this.add.container(0, 24);
       const badgeBg = this.add.graphics();
       const videoIcon = this.add.graphics();
       const badgeTxt = this.add
         .text(0, 0, '', {
           fontFamily: FONT_FAMILY,
-          fontSize: '11px',
+          fontSize: '10px',
           fontStyle: 'bold',
           color: '#ffffff',
           stroke: '#1b1e3f',
@@ -817,7 +908,7 @@ export default class GameScene extends Phaser.Scene {
 
       badgeGroup.add([badgeBg, videoIcon, badgeTxt]);
 
-      const zone = this.add.zone(0, 0, w + 6, h + 10).setInteractive({ useHandCursor: true });
+      const zone = this.add.zone(0, 0, w + 4, h + 10).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', (pointer) => {
         pointer.event?.stopPropagation?.();
         soundFX.playClick();
@@ -829,12 +920,15 @@ export default class GameScene extends Phaser.Scene {
       return { container, badgeBg, videoIcon, txt: badgeTxt };
     };
 
-    const shakeObj = makeIconTile(236, 106, 'booster_shake', 0x7209b7, 0x3c096c, () => this.triggerShakeBooster());
-    const pinObj = makeIconTile(312, 106, 'booster_pin', 0xf72585, 0x9e0059, () => this.triggerPinBooster());
+    const shakeObj = makeIconTile(220, 106, 'booster_shake', 0x7209b7, 0x3c096c, () => this.triggerShakeBooster());
+    const pinObj = makeIconTile(274, 106, 'booster_pin', 0xf72585, 0x9e0059, () => this.triggerPinBooster());
+    const rainbowObj = makeIconTile(328, 106, 'booster_rainbow', 0x00b4d8, 0x0077b6, () => this.triggerRainbowBooster());
     this.shakeContainer = shakeObj.container;
     this.pinContainer = pinObj.container;
+    this.rainbowContainer = rainbowObj.container;
     this.shakeBadge = shakeObj;
     this.pinBadge = pinObj;
+    this.rainbowBadge = rainbowObj;
     this.shakeNudged = false;
     this.pinNudged = false;
     this.refreshBoosterLabels();
@@ -846,19 +940,19 @@ export default class GameScene extends Phaser.Scene {
     badgeBg.clear();
     videoIcon.clear();
 
-    const w = 56;
-    const h = 20;
+    const w = 46;
+    const h = 18;
     let fill = 0xff9f1c;
     if (mode === 'nudge') fill = 0x39e5b6;
     else if (mode === 'token') fill = 0x06d6a0;
 
     // Pill shadow + body + white border
     badgeBg.fillStyle(0x000000, 0.35);
-    badgeBg.fillRoundedRect(-w / 2, -h / 2 + 2, w, h, 10);
+    badgeBg.fillRoundedRect(-w / 2, -h / 2 + 2, w, h, 9);
     badgeBg.fillStyle(fill, 1);
-    badgeBg.fillRoundedRect(-w / 2, -h / 2, w, h, 10);
-    badgeBg.lineStyle(2, 0xffffff, 0.95);
-    badgeBg.strokeRoundedRect(-w / 2, -h / 2, w, h, 10);
+    badgeBg.fillRoundedRect(-w / 2, -h / 2, w, h, 9);
+    badgeBg.lineStyle(1.8, 0xffffff, 0.95);
+    badgeBg.strokeRoundedRect(-w / 2, -h / 2, w, h, 9);
 
     if (mode === 'nudge') {
       txt.setX(0);
@@ -873,11 +967,11 @@ export default class GameScene extends Phaser.Scene {
     } else {
       // Draw mini video clapper/play icon on the left + localized AD/PUB label
       videoIcon.fillStyle(0x1b1e3f, 0.9);
-      videoIcon.fillRoundedRect(-21, -6, 15, 12, 3);
+      videoIcon.fillRoundedRect(-18, -5.5, 13, 11, 3);
       videoIcon.fillStyle(0xffffff, 1);
-      videoIcon.fillTriangle(-16, -3.5, -16, 3.5, -9.5, 0);
+      videoIcon.fillTriangle(-13.5, -3, -13.5, 3, -8, 0);
 
-      txt.setX(10);
+      txt.setX(8);
       txt.setColor('#ffffff');
       txt.setStroke('#7c2d12', 3);
       txt.setText(t('adBadge'));
@@ -895,6 +989,10 @@ export default class GameScene extends Phaser.Scene {
       mode: this.pinNudged ? 'nudge' : tokens > 0 ? 'token' : 'ad',
       tokens,
       nudgeText: '🆘 SOS!',
+    });
+    this.drawBoosterBadge(this.rainbowBadge, {
+      mode: tokens > 0 ? 'token' : 'ad',
+      tokens,
     });
   }
 
@@ -1114,7 +1212,12 @@ export default class GameScene extends Phaser.Scene {
 
     soundFX.playDrop();
     haptics.drop();
-    this.spawnPhysicsFruit(this.aimX, DROP_Y, this.currentTier, false);
+    if (this.isRainbowNext) {
+      this.isRainbowNext = false;
+      this.spawnRainbowFruit(this.aimX, DROP_Y);
+    } else {
+      this.spawnPhysicsFruit(this.aimX, DROP_Y, this.currentTier, false);
+    }
 
     if (this.gameMode === 'levels') {
       this.movesLeft = Math.max(0, this.movesLeft - 1);
@@ -1134,6 +1237,23 @@ export default class GameScene extends Phaser.Scene {
         this.prepareNextDrop();
       }
     });
+  }
+
+  spawnRainbowFruit(x, y) {
+    const fruit = this.matter.add.image(x, y, 'fruit_rainbow', null, {
+      shape: { type: 'circle', radius: 24 },
+      restitution: 0.28,
+      friction: 0.08,
+      frictionAir: 0.008,
+      density: 0.0024,
+      label: 'fruit_rainbow',
+    });
+    fruit.setData('isRainbow', true);
+    fruit.setData('merging', false);
+    fruit.setData('spawnTime', this.time.now);
+    fruit.setDepth(4);
+    this.fruits.push(fruit);
+    return fruit;
   }
 
   spawnPhysicsFruit(x, y, tier, isMerge = false) {
@@ -1203,10 +1323,20 @@ export default class GameScene extends Phaser.Scene {
         if (!objA || !objB || !objA.active || !objB.active) continue;
         if (objA.getData('merging') || objB.getData('merging')) continue;
 
+        const isRainA = objA.getData('isRainbow') === true;
+        const isRainB = objB.getData('isRainbow') === true;
         const tierA = objA.getData('tier');
         const tierB = objB.getData('tier');
 
-        if (tierA !== undefined && tierA === tierB) {
+        if (isRainA && tierB !== undefined) {
+          objA.setData('merging', true);
+          objB.setData('merging', true);
+          this.handleRainbowMerge(objA, objB, tierB);
+        } else if (isRainB && tierA !== undefined) {
+          objA.setData('merging', true);
+          objB.setData('merging', true);
+          this.handleRainbowMerge(objB, objA, tierA);
+        } else if (tierA !== undefined && tierA === tierB) {
           objA.setData('merging', true);
           objB.setData('merging', true);
           this.handleMerge(objA, objB, tierA);
@@ -1261,6 +1391,61 @@ export default class GameScene extends Phaser.Scene {
         });
       },
     });
+  }
+
+  handleRainbowMerge(rainbowObj, targetObj, targetTier) {
+    const midX = targetObj.x;
+    const midY = targetObj.y;
+
+    this.fruits = this.fruits.filter((f) => f !== rainbowObj && f !== targetObj);
+    rainbowObj.destroy();
+    targetObj.destroy();
+
+    const nextTier = Math.min(FRUITS.length - 1, targetTier + 1);
+    if (targetTier < FRUITS.length - 1) {
+      this.spawnPhysicsFruit(midX, midY, nextTier, true);
+    }
+
+    const bonus = targetTier >= FRUITS.length - 1 ? 500 : FRUITS[nextTier].score * 2;
+    this.score += bonus;
+    this.scoreText?.setText(String(this.score));
+    if (storageManager.updateBestScore(this.score)) {
+      this.bestScore = this.score;
+      this.bestText?.setText(`👑 ${this.bestScore}`);
+    }
+
+    soundFX.playMerge(Math.min(10, nextTier + 1));
+    soundFX.playComboBanner();
+    haptics.merge(nextTier, 3);
+    this.flashScreen(0x9bf6ff, 0.32);
+    this.spawnConfetti(midX, midY, 28);
+    const popTxt = this.add
+      .text(midX, midY - 12, `+${bonus}`, {
+        fontFamily: FONT_FAMILY,
+        fontSize: '20px',
+        fontStyle: 'bold',
+        color: '#9bf6ff',
+        stroke: '#0d0e22',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(20);
+    this.tweens.add({
+      targets: popTxt,
+      y: midY - 56,
+      alpha: 0,
+      duration: 650,
+      onComplete: () => popTxt.destroy(),
+    });
+    this.showCallout(t('rainbowCallout'), '#80ffdb');
+
+    storageManager.recordDailyProgress({ score: this.score, maxTier: nextTier, combo: Math.max(1, this.comboCount) });
+    storageManager.updateMaxTier(nextTier);
+    this.refreshQuestBadge();
+    this.checkRunMission({ tier: nextTier, combo: Math.max(1, this.comboCount), score: this.score });
+    this.updateMissionPill();
+    this.updateEvolutionBarHighlights?.();
+    this.checkLevelWin(nextTier);
   }
 
   handleMerge(objA, objB, tier) {
@@ -1835,6 +2020,36 @@ export default class GameScene extends Phaser.Scene {
     }
 
     this.spawnConfetti(GAME_WIDTH / 2, JAR_TOP + 60, 20);
+  }
+
+  _executeRainbow() {
+    this.isRainbowNext = true;
+    this.dropperFruit?.setTexture('fruit_rainbow');
+    this.dropperFruit?.setScale(1.1);
+    this.dropperFruit?.setVisible(true);
+    this.canDrop = true;
+    this.flashScreen(0x9bf6ff, 0.22);
+    soundFX.playComboBanner();
+    haptics.merge(4, 3);
+    this.showToast(t('rainbowReady'));
+  }
+
+  triggerRainbowBooster() {
+    if (this.isGameOver || this.isRainbowNext || adManager.isShowingAd) return;
+
+    if (storageManager.consumeFreeToken()) {
+      this.refreshBoosterLabels();
+      this._executeRainbow();
+      return;
+    }
+
+    adManager.showRewarded({
+      onStart: () => this.pauseForAd(),
+      onReward: () => this._executeRainbow(),
+      onDismiss: () => this.resumeFromAd(),
+      onNoReward: (reason) => this.showToast(`⚠️ Pub fermée (${reason})`),
+      onError: () => this.showToast('⚠️ Pub indisponible'),
+    });
   }
 
   triggerShakeBooster() {
