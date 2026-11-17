@@ -269,7 +269,7 @@ async function main() {
       screenUri: s3,
       badge: '⚡ BOOSTERS STRATÉGIQUES',
       title: 'SAUVEZ VOTRE PARTIE !',
-      subtitle: 'Secouer • Épingle • Seconde chance',
+      subtitle: 'Secouer • Épingle • Arc-en-ciel',
       accent: '#06d6a0',
     }),
     1080,
