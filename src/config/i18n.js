@@ -339,6 +339,9 @@ DICT.fr.dailyGiftClaim = 'RÉCLAMER';
 DICT.fr.dailyGiftClaimed = '🎁 +{tokens} jeton(s) & +{xp} XP !';
 DICT.fr.rainbowReady = '🌈 Fruit Arc-en-ciel prêt !';
 DICT.fr.rainbowCallout = '🌈 FUSION UNIVERSELLE !';
+DICT.fr.boosterShakeShort = 'SECOUER';
+DICT.fr.boosterPinShort = 'PERCER';
+DICT.fr.boosterRainbowShort = 'JOKER';
 
 DICT.en.activeTheme = '✓ ACTIVE';
 DICT.en.tapToUse = 'Tap to equip';
@@ -357,6 +360,9 @@ DICT.en.dailyGiftClaim = 'CLAIM';
 DICT.en.dailyGiftClaimed = '🎁 +{tokens} token(s) & +{xp} XP!';
 DICT.en.rainbowReady = '🌈 Rainbow Fruit ready!';
 DICT.en.rainbowCallout = '🌈 SUPER MERGE!';
+DICT.en.boosterShakeShort = 'SHAKE';
+DICT.en.boosterPinShort = 'POP';
+DICT.en.boosterRainbowShort = 'JOKER';
 
 DICT.de.activeTheme = '✓ AKTIV';
 DICT.de.tapToUse = 'Tippen zum Aktivieren';
@@ -375,6 +381,9 @@ DICT.de.dailyGiftClaim = 'ABHOLEN';
 DICT.de.dailyGiftClaimed = '🎁 +{tokens} Token & +{xp} XP!';
 DICT.de.rainbowReady = '🌈 Regenbogen-Frucht bereit!';
 DICT.de.rainbowCallout = '🌈 SUPER-FUSION!';
+DICT.de.boosterShakeShort = 'MIXEN';
+DICT.de.boosterPinShort = 'PLATZ';
+DICT.de.boosterRainbowShort = 'JOKER';
 
 DICT.ja.activeTheme = '✓ 使用中';
 DICT.ja.tapToUse = 'タップで変更';
@@ -393,6 +402,9 @@ DICT.ja.dailyGiftClaim = 'うけとる';
 DICT.ja.dailyGiftClaimed = '🎁 +{tokens} トークン & +{xp} XP！';
 DICT.ja.rainbowReady = '🌈 レインボーフルーツ準備完了！';
 DICT.ja.rainbowCallout = '🌈 スーパー合体！';
+DICT.ja.boosterShakeShort = 'シェイク';
+DICT.ja.boosterPinShort = 'けす';
+DICT.ja.boosterRainbowShort = 'レインボー';
 
 DICT.ar.quitBtn = '🚪  خروج';
 DICT.ar.adBadge = 'إعلان';
@@ -407,6 +419,9 @@ DICT.ar.dailyGiftClaim = 'استلام';
 DICT.ar.dailyGiftClaimed = '🎁 +{tokens} عملة و +{xp} XP!';
 DICT.ar.rainbowReady = '🌈 فاكهة قوس قزح جاهزة!';
 DICT.ar.rainbowCallout = '🌈 دمج خارق!';
+DICT.ar.boosterShakeShort = 'هز';
+DICT.ar.boosterPinShort = 'فرقع';
+DICT.ar.boosterRainbowShort = 'جوكر';
 
 export function detectSystemLang() {
   if (typeof navigator === 'undefined') return 'en';

@@ -21,11 +21,11 @@ const FONT_FAMILY = 'Fredoka, "Arial Rounded MT Bold", "Trebuchet MS", sans-seri
 // Container / Jar geometry (calibrated for 2-4 min Sweet Spot)
 const JAR_LEFT = 62;
 const JAR_RIGHT = 418;
-const JAR_TOP = 262;
-const JAR_BOTTOM = 758;
+const JAR_TOP = 250;
+const JAR_BOTTOM = 706;
 const WALL_THICKNESS = 24;
-const DANGER_Y = 290;
-const DROP_Y = 212;
+const DANGER_Y = 278;
+const DROP_Y = 204;
 
 const CONFETTI_COLORS = [0xff3b5c, 0xffd166, 0x06d6a0, 0x118ab2, 0x9b5de5, 0xff7b00];
 
@@ -400,25 +400,25 @@ export default class GameScene extends Phaser.Scene {
       }
     });
 
-    // 3D Glossy Score Card
+    // 3D Glossy Score Card (wide, clean)
     const scoreBg = this.add.graphics();
     scoreBg.fillStyle(0x0b0824, 0.6);
-    scoreBg.fillRoundedRect(24, 78, 166, 68, 18);
+    scoreBg.fillRoundedRect(24, 76, 292, 62, 18);
     scoreBg.fillStyle(0x23295e, 0.96);
-    scoreBg.fillRoundedRect(24, 74, 166, 68, 18);
+    scoreBg.fillRoundedRect(24, 72, 292, 62, 18);
     scoreBg.fillStyle(0xffffff, 0.08);
-    scoreBg.fillRoundedRect(32, 77, 150, 14, 7);
+    scoreBg.fillRoundedRect(32, 75, 276, 13, 7);
     scoreBg.lineStyle(2, 0x9bf6ff, 0.65);
-    scoreBg.strokeRoundedRect(24, 74, 166, 68, 18);
+    scoreBg.strokeRoundedRect(24, 72, 292, 62, 18);
 
-    this.add.text(36, 82, t('score'), {
+    this.add.text(38, 79, t('score'), {
       fontFamily: FONT_FAMILY,
-      fontSize: '12px',
+      fontSize: '11px',
       fontStyle: 'bold',
       color: '#9bf6ff',
     });
 
-    this.scoreText = this.add.text(36, 98, '0', {
+    this.scoreText = this.add.text(38, 93, '0', {
       fontFamily: FONT_FAMILY,
       fontSize: '31px',
       fontStyle: 'bold',
@@ -428,45 +428,52 @@ export default class GameScene extends Phaser.Scene {
     });
 
     this.bestText = this.add
-      .text(178, 82, `👑 ${this.bestScore}`, {
+      .text(302, 103, `👑 ${this.bestScore}`, {
         fontFamily: FONT_FAMILY,
-        fontSize: '13px',
+        fontSize: '15px',
         fontStyle: 'bold',
         color: '#ffd166',
       })
-      .setOrigin(1, 0);
+      .setOrigin(1, 0.5);
 
-    // 3D Glossy Next Fruit Card
+    // 3D Glossy Next Fruit Card (enlarged & clear)
     const nextBg = this.add.graphics();
     nextBg.fillStyle(0x0b0824, 0.6);
-    nextBg.fillRoundedRect(GAME_WIDTH - 122, 78, 98, 68, 18);
+    nextBg.fillRoundedRect(GAME_WIDTH - 148, 76, 124, 62, 18);
     nextBg.fillStyle(0x23295e, 0.96);
-    nextBg.fillRoundedRect(GAME_WIDTH - 122, 74, 98, 68, 18);
+    nextBg.fillRoundedRect(GAME_WIDTH - 148, 72, 124, 62, 18);
     nextBg.fillStyle(0xffffff, 0.08);
-    nextBg.fillRoundedRect(GAME_WIDTH - 114, 77, 82, 14, 7);
+    nextBg.fillRoundedRect(GAME_WIDTH - 140, 75, 108, 13, 7);
     nextBg.lineStyle(2, 0xff8fab, 0.65);
-    nextBg.strokeRoundedRect(GAME_WIDTH - 122, 74, 98, 68, 18);
+    nextBg.strokeRoundedRect(GAME_WIDTH - 148, 72, 124, 62, 18);
 
     this.add
-      .text(GAME_WIDTH - 73, 81, t('next'), {
+      .text(GAME_WIDTH - 134, 103, t('next'), {
         fontFamily: FONT_FAMILY,
         fontSize: '11px',
         fontStyle: 'bold',
         color: '#ffccd5',
       })
-      .setOrigin(0.5, 0);
+      .setOrigin(0, 0.5);
 
-    this.add.circle(GAME_WIDTH - 73, 117, 19, 0xffffff, 0.08);
-    this.nextPreviewSprite = this.add.image(GAME_WIDTH - 73, 117, 'fruit_0').setScale(0.75);
+    this.add.circle(GAME_WIDTH - 56, 103, 22, 0xffffff, 0.1);
+    this.nextPreviewSprite = this.add.image(GAME_WIDTH - 56, 103, 'fruit_0').setScale(0.85);
 
-    // Rewarded Booster Pills (aligned neatly between Score & Next)
-    this.createBoosterButtons();
-
-    // Live Level Goal / Mission Progress Bar (right below HUD, safely above DROP_Y)
+    // 3-Pill Visual Objective Bar (Level | Target Fruit + Progress | Moves)
     this.missionPillBg = this.add.graphics().setDepth(10);
-    this.missionTargetIcon = this.add.image(40, 159, 'fruit_0').setDisplaySize(22, 22).setDepth(11).setVisible(false);
+    this.missionLevelText = this.add
+      .text(68, 158, '', {
+        fontFamily: FONT_FAMILY,
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#ffd166',
+      })
+      .setOrigin(0.5)
+      .setDepth(11);
+
+    this.missionTargetIcon = this.add.image(140, 158, 'fruit_0').setDisplaySize(26, 26).setDepth(11).setVisible(false);
     this.missionText = this.add
-      .text(GAME_WIDTH / 2 + 6, 159, '', {
+      .text(254, 158, '', {
         fontFamily: FONT_FAMILY,
         fontSize: '12px',
         fontStyle: 'bold',
@@ -476,6 +483,46 @@ export default class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(11);
+
+    this.missionMovesText = this.add
+      .text(412, 158, '', {
+        fontFamily: FONT_FAMILY,
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5)
+      .setDepth(11);
+
+    // Side-Margin Widgets (Left: Star Thresholds, Right: Live Combo Meter)
+    this.starSidebarBg = this.add.graphics().setDepth(9);
+    this.starSidebarText = this.add
+      .text(31, JAR_TOP + 96, '⭐\n⭐\n⭐', {
+        fontFamily: FONT_FAMILY,
+        fontSize: '14px',
+        align: 'center',
+        lineSpacing: 6,
+      })
+      .setOrigin(0.5)
+      .setDepth(10);
+
+    this.comboSidebarBg = this.add.graphics().setDepth(9);
+    this.comboSidebarText = this.add
+      .text(GAME_WIDTH - 31, JAR_TOP + 96, '🔥\n×1', {
+        fontFamily: FONT_FAMILY,
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#94a3b8',
+        align: 'center',
+        lineSpacing: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(10);
+    this.updateComboSidebar(1);
+
+    // Thumb-Zone Booster Dock (below jar, above evolution bar)
+    this.createBoosterButtons();
+
     this.updateMissionPill();
 
     // Pin Mode Hint Banner
@@ -516,6 +563,59 @@ export default class GameScene extends Phaser.Scene {
     return best;
   }
 
+  updateComboSidebar(combo = 1) {
+    if (!this.comboSidebarBg || !this.comboSidebarText) return;
+    const x = GAME_WIDTH - 52;
+    const y = JAR_TOP + 48;
+    const w = 42;
+    const h = 96;
+    const isHot = combo >= 2;
+    const col = combo >= 4 ? 0xff4d6d : combo >= 2 ? 0xff9f1c : 0x1e2246;
+
+    this.comboSidebarBg.clear();
+    this.comboSidebarBg.fillStyle(col, isHot ? 0.92 : 0.65);
+    this.comboSidebarBg.fillRoundedRect(x, y, w, h, 14);
+    this.comboSidebarBg.lineStyle(1.8, isHot ? 0xffd166 : 0xffffff, isHot ? 0.95 : 0.2);
+    this.comboSidebarBg.strokeRoundedRect(x, y, w, h, 14);
+
+    this.comboSidebarText.setText(isHot ? `🔥\n×${combo}` : `✨\n×1`);
+    this.comboSidebarText.setColor(isHot ? '#ffffff' : '#94a3b8');
+    if (isHot) {
+      this.tweens.add({
+        targets: this.comboSidebarText,
+        scale: 1.22,
+        duration: 90,
+        yoyo: true,
+      });
+    }
+  }
+
+  updateStarSidebar() {
+    if (!this.starSidebarBg || !this.starSidebarText) return;
+    const x = 10;
+    const y = JAR_TOP + 48;
+    const w = 42;
+    const h = 96;
+    this.starSidebarBg.clear();
+    this.starSidebarBg.fillStyle(0x1e2246, 0.7);
+    this.starSidebarBg.fillRoundedRect(x, y, w, h, 14);
+    this.starSidebarBg.lineStyle(1.5, 0xffd166, 0.35);
+    this.starSidebarBg.strokeRoundedRect(x, y, w, h, 14);
+
+    if (this.gameMode === 'levels' && this.levelCfg) {
+      const s3 = this.levelCfg.star3Left ?? 4;
+      const s2 = this.levelCfg.star2Left ?? 2;
+      const earned = this.movesLeft >= s3 ? 3 : this.movesLeft >= s2 ? 2 : 1;
+      const lines = [earned >= 3 ? '⭐' : '☆', earned >= 2 ? '⭐' : '☆', '⭐'];
+      this.starSidebarText.setText(lines.join('\n'));
+      this.starSidebarBg.setVisible(true);
+      this.starSidebarText.setVisible(true);
+    } else {
+      this.starSidebarBg.setVisible(false);
+      this.starSidebarText.setVisible(false);
+    }
+  }
+
   updateMissionPill() {
     if (!this.missionText || !this.missionPillBg) return;
 
@@ -535,80 +635,86 @@ export default class GameScene extends Phaser.Scene {
         progress = tierRatio;
       }
       const pct = Math.round(progress * 100);
-      const fruitName = getFruitName(this.levelCfg.targetTier);
-      const scorePart = this.levelCfg.minScore > 0 ? ` · ${this.score}/${this.levelCfg.minScore}` : '';
-      this.missionText.setColor(isLowMoves ? '#ffccd5' : '#ffffff');
-      this.missionText.setText(
-        `${t('levelShort')} ${this.campaignLevel} · ${t('goalFruitMoves', {
-          fruit: fruitName,
-          moves: this.movesLeft,
-        })}${scorePart} · ${pct}%`
-      );
+      this.missionLevelText?.setText(`${t('levelShort')} ${this.campaignLevel}`);
+      this.missionText.setColor('#ffffff');
+      this.missionText.setText(`${pct}%`);
+      this.missionMovesText?.setText(`🎯 ${this.movesLeft}`);
+      this.missionMovesText?.setColor(isLowMoves ? '#ffccd5' : '#ffffff');
     } else {
       const m = RUN_MISSIONS[this.missionIndex];
+      this.missionLevelText?.setText(`♾️`);
       this.missionText.setColor('#ffffff');
       if (!m) {
         progress = Math.min(1, this.score / Math.max(1, this.eliteGoalScore));
         const pct = Math.round(progress * 100);
-        this.missionText.setText(`👑 ${t('endless')} · ${t('goalScore', { score: this.eliteGoalScore })} · ${pct}%`);
+        this.missionText.setText(`${this.score}/${this.eliteGoalScore} (${pct}%)`);
+        this.missionMovesText?.setText('👑');
       } else {
         let label = '';
         if (m.type === 'tier') {
           targetFruitTier = m.target;
-          label = getFruitName(m.target);
           progress = bestRunTier >= 0 ? Math.min(1, (bestRunTier + 1) / (m.target + 1)) : 0;
+          label = `${Math.round(progress * 100)}%`;
         } else if (m.type === 'combo') {
-          label = `Combo ×${m.target}`;
           progress = Math.min(1, (this.comboCount || 0) / Math.max(1, m.target));
+          label = `🔥×${m.target}`;
         } else {
-          label = `${this.score}/${m.target} pts`;
           progress = Math.min(1, this.score / Math.max(1, m.target));
+          label = `${this.score}/${m.target}`;
         }
-        const pct = Math.round(progress * 100);
-        this.missionText.setText(`♾️ ${t('endless')} · 🎯 ${label} · ${pct}%`);
+        this.missionText.setText(label);
+        this.missionMovesText?.setText(`+${m.reward}`);
       }
     }
 
-    // Target fruit icon on the left of the progress bar
+    // Target fruit icon on the left of the center goal pill
     if (this.missionTargetIcon) {
       if (targetFruitTier !== null) {
         this.missionTargetIcon
           .setTexture(`fruit_${targetFruitTier}`)
-          .setDisplaySize(22, 22)
+          .setDisplaySize(26, 26)
           .setVisible(true);
-        this.missionText.setX(GAME_WIDTH / 2 + 10);
+        this.missionText.setX(254);
       } else {
         this.missionTargetIcon.setVisible(false);
-        this.missionText.setX(GAME_WIDTH / 2);
+        this.missionText.setX(240);
       }
     }
 
-    // Draw live hybrid-casual progress bar
-    const barX = 24;
-    const barY = 146;
-    const barW = GAME_WIDTH - 48;
-    const barH = 26;
+    // Draw 3-pill visual objective bar (y = 142, h = 32)
+    const barY = 142;
+    const barH = 32;
+    const gX = 120;
+    const gW = 240;
     const fillColor = isLowMoves ? 0xff4d6d : progress >= 0.75 ? 0x06d6a0 : 0xff9f1c;
 
     this.missionPillBg.clear();
-    // Recessed dark track
-    this.missionPillBg.fillStyle(0x111330, 0.94);
-    this.missionPillBg.fillRoundedRect(barX, barY, barW, barH, 13);
+    // 1. Left Level Pill
+    this.missionPillBg.fillStyle(0x1b1e3f, 0.95);
+    this.missionPillBg.fillRoundedRect(24, barY, 88, barH, 14);
+    this.missionPillBg.lineStyle(1.8, 0xffd166, 0.75);
+    this.missionPillBg.strokeRoundedRect(24, barY, 88, barH, 14);
 
-    // Filled progress bar
+    // 2. Center Goal Progress Pill
+    this.missionPillBg.fillStyle(0x111330, 0.95);
+    this.missionPillBg.fillRoundedRect(gX, barY, gW, barH, 16);
     if (progress > 0) {
-      const fillW = Math.max(24, Math.round(barW * Math.min(1, progress)));
-      this.missionPillBg.fillStyle(fillColor, 0.85);
-      this.missionPillBg.fillRoundedRect(barX, barY, fillW, barH, 13);
-      // Glossy top shine on progress bar
+      const fillW = Math.max(28, Math.round(gW * Math.min(1, progress)));
+      this.missionPillBg.fillStyle(fillColor, 0.88);
+      this.missionPillBg.fillRoundedRect(gX, barY, fillW, barH, 16);
       this.missionPillBg.fillStyle(0xffffff, 0.24);
-      this.missionPillBg.fillRoundedRect(barX + 6, barY + 3, Math.max(8, fillW - 12), 8, 4);
+      this.missionPillBg.fillRoundedRect(gX + 8, barY + 3, Math.max(8, fillW - 16), 9, 5);
     }
+    this.missionPillBg.lineStyle(1.8, isLowMoves ? 0xff4d6d : 0x9bf6ff, 0.8);
+    this.missionPillBg.strokeRoundedRect(gX, barY, gW, barH, 16);
 
-    // Crisp border
-    this.missionPillBg.lineStyle(1.8, isLowMoves ? 0xff4d6d : 0xffd166, 0.85);
-    this.missionPillBg.strokeRoundedRect(barX, barY, barW, barH, 13);
+    // 3. Right Moves Pill
+    this.missionPillBg.fillStyle(isLowMoves ? 0x9d0246 : 0x1b1e3f, 0.95);
+    this.missionPillBg.fillRoundedRect(368, barY, 88, barH, 14);
+    this.missionPillBg.lineStyle(1.8, isLowMoves ? 0xff4d6d : 0x06d6a0, 0.8);
+    this.missionPillBg.strokeRoundedRect(368, barY, 88, barH, 14);
 
+    this.updateStarSidebar();
     this.updateEvolutionBarHighlight?.(bestRunTier, targetFruitTier);
   }
 
@@ -868,31 +974,41 @@ export default class GameScene extends Phaser.Scene {
   createBoosterButtons() {
     this.ensureBoosterTextures();
 
-    const makeIconTile = (x, y, textureKey, fillColor, lipColor, onClick) => {
+    const makeIconTile = (x, y, textureKey, actionLabel, fillColor, lipColor, onClick) => {
       const container = this.add.container(x, y).setDepth(12);
-      const w = 50;
-      const h = 58;
+      const w = 114;
+      const h = 50;
       const bg = this.add.graphics();
       // Drop shadow
       bg.fillStyle(0x000000, 0.35);
-      bg.fillRoundedRect(-w / 2, -h / 2 + 6, w, h, 16);
+      bg.fillRoundedRect(-w / 2, -h / 2 + 5, w, h, 16);
       // 3D bottom lip
       bg.fillStyle(lipColor, 1);
-      bg.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 16);
+      bg.fillRoundedRect(-w / 2, -h / 2 + 3, w, h, 16);
       // Main candy tile body
       bg.fillStyle(fillColor, 1);
       bg.fillRoundedRect(-w / 2, -h / 2, w, h, 16);
       // Glossy top cushion highlight
-      bg.fillStyle(0xffffff, 0.28);
-      bg.fillRoundedRect(-w / 2 + 5, -h / 2 + 3, w - 10, 14, 7);
+      bg.fillStyle(0xffffff, 0.25);
+      bg.fillRoundedRect(-w / 2 + 6, -h / 2 + 3, w - 12, 14, 7);
       // Crisp cream-white border
       bg.lineStyle(2, 0xffffff, 0.85);
       bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 16);
 
-      const iconImg = this.add.image(0, -5, textureKey).setDisplaySize(38, 38);
+      const iconImg = this.add.image(-30, 0, textureKey).setDisplaySize(38, 38);
+      const actionTxt = this.add
+        .text(16, 1, actionLabel, {
+          fontFamily: FONT_FAMILY,
+          fontSize: '12px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          stroke: '#1b1e3f',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5);
 
-      // Overlapping bottom pill badge
-      const badgeGroup = this.add.container(0, 24);
+      // Discreet top-right corner badge (▶ or ×N)
+      const badgeGroup = this.add.container(44, -22);
       const badgeBg = this.add.graphics();
       const videoIcon = this.add.graphics();
       const badgeTxt = this.add
@@ -912,17 +1028,23 @@ export default class GameScene extends Phaser.Scene {
       zone.on('pointerdown', (pointer) => {
         pointer.event?.stopPropagation?.();
         soundFX.playClick();
-        this.tweens.add({ targets: container, scale: 0.9, duration: 65, yoyo: true });
+        this.tweens.add({ targets: container, scale: 0.92, duration: 65, yoyo: true });
         onClick();
       });
 
-      container.add([bg, iconImg, badgeGroup, zone]);
+      container.add([bg, iconImg, actionTxt, badgeGroup, zone]);
       return { container, badgeBg, videoIcon, txt: badgeTxt };
     };
 
-    const shakeObj = makeIconTile(220, 106, 'booster_shake', 0x7209b7, 0x3c096c, () => this.triggerShakeBooster());
-    const pinObj = makeIconTile(274, 106, 'booster_pin', 0xf72585, 0x9e0059, () => this.triggerPinBooster());
-    const rainbowObj = makeIconTile(328, 106, 'booster_rainbow', 0x00b4d8, 0x0077b6, () => this.triggerRainbowBooster());
+    const shakeObj = makeIconTile(104, 754, 'booster_shake', t('boosterShakeShort'), 0x7209b7, 0x3c096c, () =>
+      this.triggerShakeBooster()
+    );
+    const pinObj = makeIconTile(240, 754, 'booster_pin', t('boosterPinShort'), 0xf72585, 0x9e0059, () =>
+      this.triggerPinBooster()
+    );
+    const rainbowObj = makeIconTile(376, 754, 'booster_rainbow', t('boosterRainbowShort'), 0x00b4d8, 0x0077b6, () =>
+      this.triggerRainbowBooster()
+    );
     this.shakeContainer = shakeObj.container;
     this.pinContainer = pinObj.container;
     this.rainbowContainer = rainbowObj.container;
@@ -940,7 +1062,7 @@ export default class GameScene extends Phaser.Scene {
     badgeBg.clear();
     videoIcon.clear();
 
-    const w = 46;
+    const w = mode === 'nudge' ? 48 : 30;
     const h = 18;
     let fill = 0xff9f1c;
     if (mode === 'nudge') fill = 0x39e5b6;
@@ -965,16 +1087,10 @@ export default class GameScene extends Phaser.Scene {
       txt.setStroke('#064e3b', 3);
       txt.setText(`×${tokens}`);
     } else {
-      // Draw mini video clapper/play icon on the left + localized AD/PUB label
-      videoIcon.fillStyle(0x1b1e3f, 0.9);
-      videoIcon.fillRoundedRect(-18, -5.5, 13, 11, 3);
+      // Discreet play triangle icon (no distracting "PUB" text)
       videoIcon.fillStyle(0xffffff, 1);
-      videoIcon.fillTriangle(-13.5, -3, -13.5, 3, -8, 0);
-
-      txt.setX(8);
-      txt.setColor('#ffffff');
-      txt.setStroke('#7c2d12', 3);
-      txt.setText(t('adBadge'));
+      videoIcon.fillTriangle(-4, -4.5, -4, 4.5, 5, 0);
+      txt.setText('');
     }
   }
 
@@ -1042,12 +1158,12 @@ export default class GameScene extends Phaser.Scene {
   }
 
   createEvolutionBar() {
-    const barY = 816;
+    const barY = 820;
     const bg = this.add.graphics().setDepth(8);
     bg.fillStyle(0x111330, 0.72);
-    bg.fillRoundedRect(14, barY - 28, GAME_WIDTH - 28, 56, 16);
+    bg.fillRoundedRect(14, barY - 26, GAME_WIDTH - 28, 52, 16);
     bg.lineStyle(1.5, 0xffffff, 0.14);
-    bg.strokeRoundedRect(14, barY - 28, GAME_WIDTH - 28, 56, 16);
+    bg.strokeRoundedRect(14, barY - 26, GAME_WIDTH - 28, 52, 16);
 
     this.evoHighlightGfx = this.add.graphics().setDepth(9);
     const maxTier = storageManager.getMaxTierReached();
@@ -1104,7 +1220,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.input.on('pointerdown', (pointer) => {
       if (this.isGameOver) return;
-      if (pointer.y < 146) return; // Ignore top HUD & booster clicks
+      if (pointer.y < 146 || pointer.y > 720) return; // Ignore top HUD & bottom booster dock
 
       if (this.pinMode) {
         this.tryPopFruitAt(pointer.x, pointer.y);
@@ -1465,6 +1581,7 @@ export default class GameScene extends Phaser.Scene {
       this.comboCount = 1;
     }
     this.lastMergeTime = now;
+    this.updateComboSidebar(this.comboCount);
 
     // Mythic Watermelon Explosion (2 Pastèques -> +5000 pts & clear space!)
     if (tier >= FRUITS.length - 1) {
