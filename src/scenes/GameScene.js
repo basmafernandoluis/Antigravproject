@@ -420,16 +420,20 @@ export default class GameScene extends Phaser.Scene {
     // Rewarded Booster Pills (aligned neatly between Score & Next)
     this.createBoosterButtons();
 
-    // Live Level Goal / Mission Pill (right below HUD, safely above DROP_Y)
-    this.missionPillBg = this.add.graphics();
+    // Live Level Goal / Mission Progress Bar (right below HUD, safely above DROP_Y)
+    this.missionPillBg = this.add.graphics().setDepth(10);
+    this.missionTargetIcon = this.add.image(40, 159, 'fruit_0').setDisplaySize(22, 22).setDepth(11).setVisible(false);
     this.missionText = this.add
-      .text(GAME_WIDTH / 2, 158, '', {
+      .text(GAME_WIDTH / 2 + 6, 159, '', {
         fontFamily: FONT_FAMILY,
         fontSize: '12px',
         fontStyle: 'bold',
-        color: '#ffd166',
+        color: '#ffffff',
+        stroke: '#0b0824',
+        strokeThickness: 3,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(11);
     this.updateMissionPill();
 
     // Pin Mode Hint Banner
@@ -459,40 +463,111 @@ export default class GameScene extends Phaser.Scene {
     this.questBadgeDot.setVisible(storageManager.hasClaimableQuests());
   }
 
+  getBestTierInJar() {
+    let best = -1;
+    if (!this.fruits) return best;
+    for (const f of this.fruits) {
+      if (!f.active) continue;
+      const tTier = f.getData('tier');
+      if (typeof tTier === 'number' && tTier > best) best = tTier;
+    }
+    return best;
+  }
+
   updateMissionPill() {
     if (!this.missionText || !this.missionPillBg) return;
 
     const isLowMoves = this.gameMode === 'levels' && this.movesLeft <= 4;
-    this.missionPillBg.clear();
-    this.missionPillBg.fillStyle(isLowMoves ? 0x590d22 : 0x1e224d, 0.92);
-    this.missionPillBg.fillRoundedRect(24, 146, GAME_WIDTH - 48, 24, 12);
-    this.missionPillBg.lineStyle(1.5, isLowMoves ? 0xff4d6d : 0xffd166, 0.75);
-    this.missionPillBg.strokeRoundedRect(24, 146, GAME_WIDTH - 48, 24, 12);
+    const bestRunTier = this.getBestTierInJar();
+    let progress = 0;
+    let targetFruitTier = null;
 
     if (this.gameMode === 'levels') {
+      targetFruitTier = this.levelCfg.targetTier;
+      const tierRatio =
+        bestRunTier >= 0 ? Math.min(1, (bestRunTier + 1) / (this.levelCfg.targetTier + 1)) : 0;
+      if (this.levelCfg.minScore > 0) {
+        const scoreRatio = Math.min(1, this.score / this.levelCfg.minScore);
+        progress = 0.65 * tierRatio + 0.35 * scoreRatio;
+      } else {
+        progress = tierRatio;
+      }
+      const pct = Math.round(progress * 100);
       const fruitName = getFruitName(this.levelCfg.targetTier);
       const scorePart = this.levelCfg.minScore > 0 ? ` · ${this.score}/${this.levelCfg.minScore}` : '';
-      this.missionText.setColor(isLowMoves ? '#ffccd5' : '#ffd166');
+      this.missionText.setColor(isLowMoves ? '#ffccd5' : '#ffffff');
       this.missionText.setText(
         `${t('levelShort')} ${this.campaignLevel} · ${t('goalFruitMoves', {
           fruit: fruitName,
           moves: this.movesLeft,
-        })}${scorePart}`
+        })}${scorePart} · ${pct}%`
       );
-      return;
+    } else {
+      const m = RUN_MISSIONS[this.missionIndex];
+      this.missionText.setColor('#ffffff');
+      if (!m) {
+        progress = Math.min(1, this.score / Math.max(1, this.eliteGoalScore));
+        const pct = Math.round(progress * 100);
+        this.missionText.setText(`👑 ${t('endless')} · ${t('goalScore', { score: this.eliteGoalScore })} · ${pct}%`);
+      } else {
+        let label = '';
+        if (m.type === 'tier') {
+          targetFruitTier = m.target;
+          label = getFruitName(m.target);
+          progress = bestRunTier >= 0 ? Math.min(1, (bestRunTier + 1) / (m.target + 1)) : 0;
+        } else if (m.type === 'combo') {
+          label = `Combo ×${m.target}`;
+          progress = Math.min(1, (this.comboCount || 0) / Math.max(1, m.target));
+        } else {
+          label = `${this.score}/${m.target} pts`;
+          progress = Math.min(1, this.score / Math.max(1, m.target));
+        }
+        const pct = Math.round(progress * 100);
+        this.missionText.setText(`♾️ ${t('endless')} · 🎯 ${label} · ${pct}%`);
+      }
     }
 
-    const m = RUN_MISSIONS[this.missionIndex];
-    this.missionText.setColor('#ffd166');
-    if (!m) {
-      this.missionText.setText(`👑 ${t('endless')} · ${t('goalScore', { score: this.eliteGoalScore })}`);
-      return;
+    // Target fruit icon on the left of the progress bar
+    if (this.missionTargetIcon) {
+      if (targetFruitTier !== null) {
+        this.missionTargetIcon
+          .setTexture(`fruit_${targetFruitTier}`)
+          .setDisplaySize(22, 22)
+          .setVisible(true);
+        this.missionText.setX(GAME_WIDTH / 2 + 10);
+      } else {
+        this.missionTargetIcon.setVisible(false);
+        this.missionText.setX(GAME_WIDTH / 2);
+      }
     }
-    let label = '';
-    if (m.type === 'tier') label = getFruitName(m.target);
-    else if (m.type === 'combo') label = `Combo ×${m.target}`;
-    else label = `${m.target} pts`;
-    this.missionText.setText(`♾️ ${t('endless')} · 🎯 ${label} (+${m.reward})`);
+
+    // Draw live hybrid-casual progress bar
+    const barX = 24;
+    const barY = 146;
+    const barW = GAME_WIDTH - 48;
+    const barH = 26;
+    const fillColor = isLowMoves ? 0xff4d6d : progress >= 0.75 ? 0x06d6a0 : 0xff9f1c;
+
+    this.missionPillBg.clear();
+    // Recessed dark track
+    this.missionPillBg.fillStyle(0x111330, 0.94);
+    this.missionPillBg.fillRoundedRect(barX, barY, barW, barH, 13);
+
+    // Filled progress bar
+    if (progress > 0) {
+      const fillW = Math.max(24, Math.round(barW * Math.min(1, progress)));
+      this.missionPillBg.fillStyle(fillColor, 0.85);
+      this.missionPillBg.fillRoundedRect(barX, barY, fillW, barH, 13);
+      // Glossy top shine on progress bar
+      this.missionPillBg.fillStyle(0xffffff, 0.24);
+      this.missionPillBg.fillRoundedRect(barX + 6, barY + 3, Math.max(8, fillW - 12), 8, 4);
+    }
+
+    // Crisp border
+    this.missionPillBg.lineStyle(1.8, isLowMoves ? 0xff4d6d : 0xffd166, 0.85);
+    this.missionPillBg.strokeRoundedRect(barX, barY, barW, barH, 13);
+
+    this.updateEvolutionBarHighlight?.(bestRunTier, targetFruitTier);
   }
 
   ensureBoosterTextures() {
@@ -828,24 +903,49 @@ export default class GameScene extends Phaser.Scene {
   }
 
   createEvolutionBar() {
-    const barY = 812;
-    const bg = this.add.graphics();
-    bg.fillStyle(0xffffff, 0.06);
-    bg.fillRoundedRect(24, barY - 22, GAME_WIDTH - 48, 44, 14);
+    const barY = 816;
+    const bg = this.add.graphics().setDepth(8);
+    bg.fillStyle(0x111330, 0.72);
+    bg.fillRoundedRect(14, barY - 28, GAME_WIDTH - 28, 56, 16);
+    bg.lineStyle(1.5, 0xffffff, 0.14);
+    bg.strokeRoundedRect(14, barY - 28, GAME_WIDTH - 28, 56, 16);
 
+    this.evoHighlightGfx = this.add.graphics().setDepth(9);
     const maxTier = storageManager.getMaxTierReached();
     this.evolutionIcons = [];
 
-    const startX = 46;
-    const stepX = (GAME_WIDTH - 92) / (FRUITS.length - 1);
+    const startX = 38;
+    const stepX = (GAME_WIDTH - 76) / (FRUITS.length - 1);
     FRUITS.forEach((f, idx) => {
       const x = startX + idx * stepX;
-      const icon = this.add.image(x, barY, `fruit_${f.tier}`);
-      const targetSize = 22 + idx * 0.8;
+      const icon = this.add.image(x, barY, `fruit_${f.tier}`).setDepth(10);
+      const targetSize = 30 + idx * 1.1;
       icon.setDisplaySize(targetSize, targetSize);
-      icon.setAlpha(idx <= maxTier ? 1 : 0.28);
+      icon.setAlpha(idx <= maxTier ? 1 : 0.34);
       this.evolutionIcons.push(icon);
     });
+
+    this.updateMissionPill();
+  }
+
+  updateEvolutionBarHighlight(bestRunTier, targetFruitTier) {
+    if (!this.evoHighlightGfx || !this.evolutionIcons || this.evolutionIcons.length === 0) return;
+    this.evoHighlightGfx.clear();
+
+    if (typeof bestRunTier === 'number' && bestRunTier >= 0 && this.evolutionIcons[bestRunTier]) {
+      const icon = this.evolutionIcons[bestRunTier];
+      const r = icon.displayWidth / 2 + 3;
+      this.evoHighlightGfx.lineStyle(2.5, 0x39e5b6, 0.95);
+      this.evoHighlightGfx.strokeCircle(icon.x, icon.y, r);
+    }
+
+    if (typeof targetFruitTier === 'number' && targetFruitTier >= 0 && this.evolutionIcons[targetFruitTier]) {
+      const icon = this.evolutionIcons[targetFruitTier];
+      const r = icon.displayWidth / 2 + 5;
+      this.evoHighlightGfx.lineStyle(2.5, 0xffd166, 0.95);
+      this.evoHighlightGfx.strokeCircle(icon.x, icon.y, r);
+      icon.setAlpha(1);
+    }
   }
 
   setupInput() {
@@ -1185,9 +1285,7 @@ export default class GameScene extends Phaser.Scene {
     storageManager.recordDailyProgress({ score: this.score, maxTier: nextTier, combo: this.comboCount });
     this.refreshQuestBadge();
     this.checkRunMission({ tier: nextTier, combo: this.comboCount, score: this.score });
-    if (this.gameMode === 'levels') {
-      this.updateMissionPill();
-    }
+    this.updateMissionPill();
     if (storageManager.updateMaxTier(nextTier)) {
       const unlockedIcon = this.evolutionIcons?.[nextTier];
       if (unlockedIcon) {
