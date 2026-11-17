@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { AdMob, AdmobConsentStatus, RewardAdPluginEvents } from '@capacitor-community/admob';
 import { AD_RULES, AD_UNIT_IDS, IS_TESTING_ADS } from '../config/ads.js';
 import { storageManager } from './StorageManager.js';
@@ -180,6 +181,8 @@ class AdManager {
     let rewardHandle = null;
     let dismissHandle = null;
     let failHandle = null;
+    let appStateHandle = null;
+    let onVisibility = null;
     let safetyTimer = null;
     let hadError = false;
 
@@ -193,10 +196,18 @@ class AdManager {
 
       this.rewardedReady = false;
 
+      let closed = false;
       let resolveClosed;
       const closedPromise = new Promise((resolve) => {
-        resolveClosed = resolve;
+        resolveClosed = () => {
+          if (closed) return;
+          closed = true;
+          resolve();
+        };
       });
+
+      const adShownAt = Date.now();
+      let sawBackground = false;
 
       rewardHandle = await AdMob.addListener(RewardAdPluginEvents.Rewarded, (reward) => {
         earnedReward = reward || { type: 'reward', amount: 1 };
@@ -207,6 +218,24 @@ class AdManager {
       failHandle = await AdMob.addListener(RewardAdPluginEvents.FailedToShow, () => {
         resolveClosed();
       });
+
+      // Fallback: when returning from native AdActivity, appStateChange / visibilitychange fires
+      appStateHandle = await App.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive) {
+          sawBackground = true;
+        } else if (sawBackground || Date.now() - adShownAt > 800) {
+          setTimeout(resolveClosed, 250);
+        }
+      });
+
+      onVisibility = () => {
+        if (document.hidden) {
+          sawBackground = true;
+        } else if (sawBackground || Date.now() - adShownAt > 800) {
+          setTimeout(resolveClosed, 250);
+        }
+      };
+      document.addEventListener('visibilitychange', onVisibility);
 
       // Do not await showRewardVideoAd alone because closing early never resolves/rejects it on Android
       AdMob.showRewardVideoAd()
@@ -227,9 +256,9 @@ class AdManager {
         }),
       ]);
 
-      // Give Capacitor bridge 300ms to flush Rewarded if Dismissed arrived first
+      // Give Capacitor bridge 350ms to flush Rewarded if Dismissed/Resume arrived first
       if (!earnedReward) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 350));
       }
 
       if (earnedReward) {
@@ -248,6 +277,8 @@ class AdManager {
       rewardHandle?.remove?.();
       dismissHandle?.remove?.();
       failHandle?.remove?.();
+      appStateHandle?.remove?.();
+      if (onVisibility) document.removeEventListener('visibilitychange', onVisibility);
       this.isShowingAd = false;
       this.preloadRewarded();
       onDismiss?.();
