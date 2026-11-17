@@ -183,7 +183,9 @@ class AdManager {
     let failHandle = null;
     let appStateHandle = null;
     let onVisibility = null;
+    let onFocus = null;
     let safetyTimer = null;
+    let postRewardTimer = null;
     let hadError = false;
 
     try {
@@ -206,11 +208,22 @@ class AdManager {
         };
       });
 
+      const markEarned = (reward) => {
+        if (!earnedReward) {
+          earnedReward = reward || { type: 'reward', amount: 1 };
+        }
+        // Hard cap: if Dismissed event is swallowed by WebView on some Android devices,
+        // still resume & grant reward within 1.5s of earning it.
+        if (!postRewardTimer) {
+          postRewardTimer = setTimeout(resolveClosed, 1500);
+        }
+      };
+
       const adShownAt = Date.now();
       let sawBackground = false;
 
       rewardHandle = await AdMob.addListener(RewardAdPluginEvents.Rewarded, (reward) => {
-        earnedReward = reward || { type: 'reward', amount: 1 };
+        markEarned(reward);
       });
       dismissHandle = await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
         resolveClosed();
@@ -219,12 +232,12 @@ class AdManager {
         resolveClosed();
       });
 
-      // Fallback: when returning from native AdActivity, appStateChange / visibilitychange fires
+      // Fallbacks when returning from native AdActivity
       appStateHandle = await App.addListener('appStateChange', ({ isActive }) => {
         if (!isActive) {
           sawBackground = true;
         } else if (sawBackground || Date.now() - adShownAt > 800) {
-          setTimeout(resolveClosed, 250);
+          setTimeout(resolveClosed, 200);
         }
       });
 
@@ -232,16 +245,23 @@ class AdManager {
         if (document.hidden) {
           sawBackground = true;
         } else if (sawBackground || Date.now() - adShownAt > 800) {
-          setTimeout(resolveClosed, 250);
+          setTimeout(resolveClosed, 200);
         }
       };
       document.addEventListener('visibilitychange', onVisibility);
 
+      onFocus = () => {
+        if (Date.now() - adShownAt > 800) {
+          setTimeout(resolveClosed, 200);
+        }
+      };
+      window.addEventListener('focus', onFocus);
+
       // Do not await showRewardVideoAd alone because closing early never resolves/rejects it on Android
       AdMob.showRewardVideoAd()
         .then((rewardItem) => {
-          if (rewardItem && !earnedReward) {
-            earnedReward = rewardItem;
+          if (rewardItem) {
+            markEarned(rewardItem);
           }
         })
         .catch((err) => {
@@ -274,11 +294,13 @@ class AdManager {
       onError?.(err);
     } finally {
       if (safetyTimer) clearTimeout(safetyTimer);
+      if (postRewardTimer) clearTimeout(postRewardTimer);
       rewardHandle?.remove?.();
       dismissHandle?.remove?.();
       failHandle?.remove?.();
       appStateHandle?.remove?.();
       if (onVisibility) document.removeEventListener('visibilitychange', onVisibility);
+      if (onFocus) window.removeEventListener('focus', onFocus);
       this.isShowingAd = false;
       this.preloadRewarded();
       onDismiss?.();

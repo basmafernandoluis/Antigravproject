@@ -21,4 +21,4 @@ const config = {
   scene: [GameScene],
 };
 
-new Phaser.Game(config);
+window.__juicyGame = new Phaser.Game(config);
