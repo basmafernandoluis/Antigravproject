@@ -1495,9 +1495,10 @@ export default class GameScene extends Phaser.Scene {
         ? 2
         : 1;
 
+    const xpGain = 100 + stars * 40;
     storageManager.completeCampaignLevel(this.campaignLevel, stars);
     storageManager.incrementGamesPlayed();
-    storageManager.addXp(100 + stars * 40);
+    storageManager.addXp(xpGain);
     storageManager.recordDailyProgress({ score: this.score, maxTier: this.levelCfg.targetTier, gameEnded: true });
     firebaseManager.logEvent('level_complete', {
       level: this.campaignLevel,
@@ -1519,72 +1520,103 @@ export default class GameScene extends Phaser.Scene {
     this.spawnConfetti(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 80, 55);
 
     const overlay = this.add
-      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.8)
-      .setDepth(20);
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.72)
+      .setDepth(20)
+      .setInteractive();
 
-    const card = this.add
-      .container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
-      .setDepth(22)
-      .setScale(0.65)
-      .setAlpha(0);
-
-    const cardBg = this.add.graphics();
-    cardBg.fillStyle(0x1b1e3f, 1);
-    cardBg.fillRoundedRect(-175, -220, 350, 446, 26);
-    cardBg.lineStyle(3, 0xffd166, 0.95);
-    cardBg.strokeRoundedRect(-175, -220, 350, 446, 26);
+    const card = this.createHybridModalCard(
+      348,
+      386,
+      0xffd166,
+      t('levelWinTitle', { n: this.campaignLevel }),
+      { ribbonColor: 0x06d6a0, titleColor: '#0b132b' }
+    ).setDepth(22);
 
     const starsStr = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
-    const starsTxt = this.add.text(0, -168, starsStr, { fontSize: '42px' }).setOrigin(0.5);
-
-    const title = this.add
-      .text(0, -112, t('levelWinTitle', { n: this.campaignLevel }), {
-        fontFamily: FONT_FAMILY,
-        fontSize: '25px',
-        fontStyle: 'bold',
-        color: '#06d6a0',
-      })
-      .setOrigin(0.5);
+    const starsTxt = this.add.text(0, -134, starsStr, { fontSize: '42px' }).setOrigin(0.5);
 
     const sub = this.add
-      .text(0, -72, t('levelWinSub', { left: this.movesLeft }), {
+      .text(0, -86, t('levelWinSub', { left: this.movesLeft }), {
         fontFamily: FONT_FAMILY,
-        fontSize: '14px',
+        fontSize: '13px',
         fontStyle: 'bold',
         color: '#cbd5ff',
-        wordWrap: { width: 300 },
+        wordWrap: { width: 296 },
         align: 'center',
       })
       .setOrigin(0.5);
 
+    // Recessed score + XP reward panel
+    const statBox = this.add.graphics();
+    statBox.fillStyle(0x111330, 0.9);
+    statBox.fillRoundedRect(-142, -56, 284, 72, 18);
+    statBox.lineStyle(1.5, 0x4a528a, 0.6);
+    statBox.strokeRoundedRect(-142, -56, 284, 72, 18);
+
     const scoreVal = this.add
-      .text(0, -22, t('finalScore', { score: this.score }), {
+      .text(0, -32, t('finalScore', { score: this.score }), {
         fontFamily: FONT_FAMILY,
-        fontSize: '24px',
+        fontSize: '23px',
         fontStyle: 'bold',
         color: '#ffd166',
       })
       .setOrigin(0.5);
 
-    const nextBtn = this.makeModalButton(0, 48, t('nextLevelBtn'), 0x06d6a0, '#0b132b', () => {
-      adManager.showInterstitialIfEligible({
-        onStart: () => this.pauseForAd(),
-        onDismiss: () => {
-          this.resumeFromAd();
-          this.scene.restart();
-        },
-      });
-    });
+    const xpPill = this.add
+      .text(0, -2, `+${xpGain} XP  •  ${'★'.repeat(stars)}`, {
+        fontFamily: FONT_FAMILY,
+        fontSize: '12px',
+        fontStyle: 'bold',
+        color: '#80ffdb',
+      })
+      .setOrigin(0.5);
 
-    const replayBtn = this.makeModalButton(0, 108, t('replayBtn'), 0x3a0ca3, '#ffffff', () => {
-      this.scene.restart();
-    });
+    const nextBtn = this.makeModalButton(
+      0,
+      62,
+      t('nextLevelBtn'),
+      0x06d6a0,
+      '#0b132b',
+      () => {
+        adManager.showInterstitialIfEligible({
+          onStart: () => this.pauseForAd(),
+          onDismiss: () => {
+            this.resumeFromAd();
+            this.scene.restart();
+          },
+        });
+      },
+      280,
+      52
+    );
 
-    const quitBtn = this.makeModalButton(0, 168, t('quitBtn'), 0x2b2d42, '#ffffff', () => {
-      this.quitGame();
-    });
+    const replayBtn = this.makeModalButton(
+      -72,
+      128,
+      `↻ ${t('replayBtn')}`,
+      0x4361ee,
+      '#ffffff',
+      () => {
+        this.scene.restart();
+      },
+      134,
+      46
+    );
 
-    card.add([cardBg, starsTxt, title, sub, scoreVal, nextBtn, replayBtn, quitBtn]);
+    const quitBtn = this.makeModalButton(
+      72,
+      128,
+      t('quitBtn'),
+      0x2b2d42,
+      '#ffffff',
+      () => {
+        this.quitGame();
+      },
+      134,
+      46
+    );
+
+    card.add([starsTxt, sub, statBox, scoreVal, xpPill, nextBtn, replayBtn, quitBtn]);
     this.gameOverObjects = [overlay, card];
 
     this.tweens.add({
@@ -1821,10 +1853,11 @@ export default class GameScene extends Phaser.Scene {
     // Darken backdrop
     const overlay = this.add
       .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0)
-      .setDepth(20);
+      .setDepth(20)
+      .setInteractive();
     this.tweens.add({
       targets: overlay,
-      fillAlpha: 0.78,
+      fillAlpha: 0.72,
       duration: 220,
     });
 
@@ -1833,134 +1866,162 @@ export default class GameScene extends Phaser.Scene {
       this.continuesUsed < AD_RULES.MAX_CONTINUES_PER_GAME && (isOutOfMoves || this.fruits.length > 0);
     const canDoubleScore = !this.scoreDoubled && this.score > 0;
 
-    // Modal Card
-    const card = this.add
-      .container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
-      .setDepth(25)
-      .setScale(0.6)
-      .setAlpha(0);
-
-    const cardH = (canContinue ? 491 : 436) + (canDoubleScore ? 0 : -50);
+    // Compact Hybrid-Casual Card (Replay & Quit side-by-side)
+    const cardH = 382 + (canContinue ? 58 : 0) + (canDoubleScore ? 58 : 0);
     const cardTop = -cardH / 2;
 
-    const cardBg = this.add.graphics();
-    cardBg.fillStyle(0x1b1e3f, 1);
-    cardBg.fillRoundedRect(-170, cardTop, 340, cardH, 24);
-    cardBg.lineStyle(3, 0xff3b5c, 0.8);
-    cardBg.strokeRoundedRect(-170, cardTop, 340, cardH, 24);
+    const card = this.createHybridModalCard(
+      348,
+      cardH,
+      0xff3b5c,
+      isOutOfMoves ? t('outOfMovesTitle') : t('gameOverTitle'),
+      { ribbonColor: 0xff3b5c, titleColor: '#ffffff' }
+    ).setDepth(25);
 
-    const title = this.add
-      .text(0, cardTop + 38, isOutOfMoves ? t('outOfMovesTitle') : t('gameOverTitle'), {
-        fontFamily: FONT_FAMILY,
-        fontSize: '26px',
-        fontStyle: 'bold',
-        color: '#ff3b5c',
-      })
-      .setOrigin(0.5);
+    // Recessed Score + Rank/XP Box
+    const statBox = this.add.graphics();
+    statBox.fillStyle(0x111330, 0.92);
+    statBox.fillRoundedRect(-146, cardTop + 34, 292, 146, 20);
+    statBox.lineStyle(1.5, 0x4a528a, 0.55);
+    statBox.strokeRoundedRect(-146, cardTop + 34, 292, 146, 20);
 
     const scoreLbl = this.add
-      .text(0, cardTop + 76, t('score'), {
+      .text(0, cardTop + 52, t('score'), {
         fontFamily: FONT_FAMILY,
-        fontSize: '12px',
+        fontSize: '11px',
         fontStyle: 'bold',
         color: '#a5b4fc',
       })
       .setOrigin(0.5);
 
     const scoreVal = this.add
-      .text(0, cardTop + 108, String(this.score), {
+      .text(0, cardTop + 82, String(this.score), {
         fontFamily: FONT_FAMILY,
-        fontSize: '38px',
+        fontSize: '36px',
         fontStyle: 'bold',
         color: '#ffffff',
       })
       .setOrigin(0.5);
 
     const bestVal = this.add
-      .text(0, cardTop + 142, `👑 ${t('bestScore', { best: this.bestScore })}`, {
+      .text(0, cardTop + 114, `👑 ${t('bestScore', { best: this.bestScore })}`, {
         fontFamily: FONT_FAMILY,
-        fontSize: '13px',
+        fontSize: '12px',
         fontStyle: 'bold',
         color: '#ffd166',
       })
       .setOrigin(0.5);
 
-    // Rank & XP Progress Bar
     const rankLabel = rankRes.leveledUp
       ? `🎉 NIV. ${rankRes.level} (${rankRes.rankLabel})  +${rankRes.levelsGained} 🎁`
       : `Niv. ${rankRes.level} • ${rankRes.rankLabel}  (+${xpEarned} XP)`;
     const rankTxt = this.add
-      .text(0, cardTop + 172, rankLabel, {
+      .text(0, cardTop + 140, rankLabel, {
         fontFamily: FONT_FAMILY,
-        fontSize: '12px',
+        fontSize: '11px',
         fontStyle: 'bold',
         color: rankRes.leveledUp ? '#06d6a0' : '#9bf6ff',
       })
       .setOrigin(0.5);
 
     const xpBarBg = this.add.graphics();
-    xpBarBg.fillStyle(0x0b0824, 0.9);
-    xpBarBg.fillRoundedRect(-120, cardTop + 188, 240, 10, 5);
+    xpBarBg.fillStyle(0x0b0824, 0.95);
+    xpBarBg.fillRoundedRect(-120, cardTop + 156, 240, 10, 5);
     xpBarBg.fillStyle(rankRes.leveledUp ? 0x06d6a0 : 0x39e5b6, 1);
-    xpBarBg.fillRoundedRect(-120, cardTop + 188, Math.max(10, 240 * rankRes.ratio), 10, 5);
+    xpBarBg.fillRoundedRect(-120, cardTop + 156, Math.max(10, 240 * rankRes.ratio), 10, 5);
 
-    card.add([cardBg, title, scoreLbl, scoreVal, bestVal, rankTxt, xpBarBg]);
+    card.add([statBox, scoreLbl, scoreVal, bestVal, rankTxt, xpBarBg]);
 
-    let nextY = cardTop + 234;
+    let nextY = cardTop + 214;
 
     // 1. Rewarded Continue (1x per game)
     if (canContinue) {
       const contLabel = isOutOfMoves ? t('continueMovesAd') : t('continueShakeAd');
-      const contBtn = this.makeModalButton(0, nextY, contLabel, 0xff9f1c, '#0b132b', () => {
-        this.handleContinue(reason);
-      });
+      const contBtn = this.makeModalButton(
+        0,
+        nextY,
+        contLabel,
+        0xff9f1c,
+        '#0b132b',
+        () => {
+          this.handleContinue(reason);
+        },
+        280,
+        48
+      );
       card.add(contBtn);
       nextY += 58;
     }
 
     // 2. Rewarded Score x2
     if (canDoubleScore) {
-      const x2Btn = this.makeModalButton(0, nextY, t('doubleScoreAd'), 0x7209b7, '#ffffff', () => {
-        adManager.showRewarded({
-          onStart: () => this.pauseForAd(),
-          onReward: () => {
-            this.scoreDoubled = true;
-            this.score *= 2;
-            this.scoreText.setText(String(this.score));
-            scoreVal.setText(String(this.score));
-            if (storageManager.updateBestScore(this.score)) {
-              this.bestScore = this.score;
-              this.bestText.setText(`👑 ${this.bestScore}`);
-              bestVal.setText(`👑 ${t('bestScore', { best: this.bestScore })}`);
-            }
-            x2Btn.destroy();
-            this.spawnConfetti(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, 35);
-          },
-          onDismiss: () => this.resumeFromAd(),
-        });
-      });
+      const x2Btn = this.makeModalButton(
+        0,
+        nextY,
+        t('doubleScoreAd'),
+        0x7209b7,
+        '#ffffff',
+        () => {
+          adManager.showRewarded({
+            onStart: () => this.pauseForAd(),
+            onReward: () => {
+              this.scoreDoubled = true;
+              this.score *= 2;
+              this.scoreText.setText(String(this.score));
+              scoreVal.setText(String(this.score));
+              if (storageManager.updateBestScore(this.score)) {
+                this.bestScore = this.score;
+                this.bestText.setText(`👑 ${this.bestScore}`);
+                bestVal.setText(`👑 ${t('bestScore', { best: this.bestScore })}`);
+              }
+              x2Btn.destroy();
+              this.spawnConfetti(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, 35);
+            },
+            onDismiss: () => this.resumeFromAd(),
+            onNoReward: (r) => this.showToast(`⚠️ Pub fermée (${r})`),
+            onError: () => this.showToast('⚠️ Pub indisponible'),
+          });
+        },
+        280,
+        48
+      );
       card.add(x2Btn);
       nextY += 58;
     }
 
-    // 3. Instant "REJOUER" Button (triggers Interstitial if eligible)
-    const replayBtn = this.makeModalButton(0, nextY, `↻  ${t('replayBtn')}`, 0x06d6a0, '#0b132b', () => {
-      adManager.showInterstitialIfEligible({
-        onStart: () => this.pauseForAd(),
-        onDismiss: () => {
-          this.resumeFromAd();
-          this.scene.restart();
-        },
-      });
-    });
-    card.add(replayBtn);
-    nextY += 56;
+    // 3. Side-by-side "REJOUER" & "QUITTER"
+    const replayBtn = this.makeModalButton(
+      -72,
+      nextY + 4,
+      `↻ ${t('replayBtn')}`,
+      0x06d6a0,
+      '#0b132b',
+      () => {
+        adManager.showInterstitialIfEligible({
+          onStart: () => this.pauseForAd(),
+          onDismiss: () => {
+            this.resumeFromAd();
+            this.scene.restart();
+          },
+        });
+      },
+      134,
+      48
+    );
 
-    // 4. Quit Game Button
-    const quitBtn = this.makeModalButton(0, nextY, t('quitBtn'), 0x2b2d42, '#ffffff', () => {
-      this.quitGame();
-    });
-    card.add(quitBtn);
+    const quitBtn = this.makeModalButton(
+      72,
+      nextY + 4,
+      t('quitBtn'),
+      0x2b2d42,
+      '#ffffff',
+      () => {
+        this.quitGame();
+      },
+      134,
+      48
+    );
+    card.add([replayBtn, quitBtn]);
 
     this.gameOverObjects = [overlay, card];
 
@@ -1978,35 +2039,124 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  makeModalButton(x, y, label, bgColor, textColor, onClick) {
+  createHybridModalCard(w, h, accentColor, titleText, { onClose = null, titleColor = '#ffffff', ribbonColor = 0x3a0ca3 } = {}) {
+    const card = this.add
+      .container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+      .setDepth(35)
+      .setScale(0.75)
+      .setAlpha(0);
+
+    const cardBg = this.add.graphics();
+    // Soft outer drop shadow
+    cardBg.fillStyle(0x040510, 0.55);
+    cardBg.fillRoundedRect(-w / 2, -h / 2 + 8, w, h, 28);
+    // Main plush card body
+    cardBg.fillStyle(0x1d2047, 1);
+    cardBg.fillRoundedRect(-w / 2, -h / 2, w, h, 28);
+    // Subtle top inner sheen
+    cardBg.fillStyle(0xffffff, 0.06);
+    cardBg.fillRoundedRect(-w / 2 + 12, -h / 2 + 10, w - 24, 46, 18);
+    // Crisp outer rim
+    cardBg.lineStyle(3, accentColor, 0.95);
+    cardBg.strokeRoundedRect(-w / 2, -h / 2, w, h, 28);
+
+    card.add(cardBg);
+
+    // Hybrid-casual overlapping top header ribbon
+    if (titleText) {
+      const rw = Math.min(w - 44, 276);
+      const rh = 42;
+      const ry = -h / 2;
+      const ribbon = this.add.graphics();
+      ribbon.fillStyle(0x000000, 0.4);
+      ribbon.fillRoundedRect(-rw / 2, ry - rh / 2 + 4, rw, rh, 21);
+      ribbon.fillStyle(ribbonColor, 1);
+      ribbon.fillRoundedRect(-rw / 2, ry - rh / 2, rw, rh, 21);
+      ribbon.fillStyle(0xffffff, 0.22);
+      ribbon.fillRoundedRect(-rw / 2 + 12, ry - rh / 2 + 3, rw - 24, 12, 6);
+      ribbon.lineStyle(2.5, 0xffffff, 0.85);
+      ribbon.strokeRoundedRect(-rw / 2, ry - rh / 2, rw, rh, 21);
+
+      const rTxt = this.add
+        .text(0, ry - 1, titleText, {
+          fontFamily: FONT_FAMILY,
+          fontSize: '18px',
+          fontStyle: 'bold',
+          color: titleColor,
+          stroke: '#0b0824',
+          strokeThickness: 3.5,
+        })
+        .setOrigin(0.5);
+
+      card.add([ribbon, rTxt]);
+    }
+
+    // Non-blocking top-right ✕ close medallion
+    if (onClose) {
+      const cx = w / 2 - 12;
+      const cy = -h / 2 + 4;
+      const closeGroup = this.add.container(cx, cy);
+      const cBg = this.add.graphics();
+      cBg.fillStyle(0x7f0a24, 1);
+      cBg.fillCircle(0, 3, 18);
+      cBg.fillStyle(0xff3b5c, 1);
+      cBg.fillCircle(0, 0, 18);
+      cBg.fillStyle(0xffffff, 0.28);
+      cBg.fillEllipse(-4, -7, 14, 7);
+      cBg.lineStyle(2.5, 0xffffff, 0.95);
+      cBg.strokeCircle(0, 0, 18);
+
+      const cTxt = this.add
+        .text(0, -1, '✕', {
+          fontFamily: FONT_FAMILY,
+          fontSize: '16px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+        })
+        .setOrigin(0.5);
+
+      const cZone = this.add.zone(0, 0, 44, 44).setInteractive({ useHandCursor: true });
+      cZone.on('pointerdown', (pointer) => {
+        pointer.event?.stopPropagation?.();
+        soundFX.playClick();
+        onClose();
+      });
+
+      closeGroup.add([cBg, cTxt, cZone]);
+      card.add(closeGroup);
+    }
+
+    return card;
+  }
+
+  makeModalButton(x, y, label, bgColor, textColor, onClick, w = 264, h = 48) {
     const container = this.add.container(x, y);
-    const w = 264;
-    const h = 50;
     const bg = this.add.graphics();
-    // Subtle dark 3D bottom lip
-    bg.fillStyle(0x000000, 0.35);
-    bg.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 25);
+    // 3D bottom lip
+    bg.fillStyle(0x000000, 0.42);
+    bg.fillRoundedRect(-w / 2, -h / 2 + 5, w, h, 24);
     // Main button fill
     bg.fillStyle(bgColor, 1);
-    bg.fillRoundedRect(-w / 2, -h / 2, w, h, 25);
+    bg.fillRoundedRect(-w / 2, -h / 2, w, h, 24);
     // Top glossy highlight
-    bg.fillStyle(0xffffff, 0.2);
-    bg.fillRoundedRect(-w / 2 + 10, -h / 2 + 3, w - 20, 12, 6);
+    bg.fillStyle(0xffffff, 0.24);
+    bg.fillRoundedRect(-w / 2 + 10, -h / 2 + 3, w - 20, 13, 7);
     // Border
-    bg.lineStyle(2, 0xffffff, 0.38);
-    bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 25);
+    bg.lineStyle(2, 0xffffff, 0.52);
+    bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 24);
 
     const txt = this.add
       .text(0, -1, label, {
         fontFamily: FONT_FAMILY,
-        fontSize: '16px',
+        fontSize: w < 180 ? '14px' : '15px',
         fontStyle: 'bold',
         color: textColor,
       })
       .setOrigin(0.5);
 
-    const zone = this.add.zone(0, 0, w, h + 4).setInteractive({ useHandCursor: true });
-    zone.on('pointerdown', () => {
+    const zone = this.add.zone(0, 0, w, h + 6).setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', (pointer) => {
+      pointer.event?.stopPropagation?.();
       soundFX.playClick();
       this.tweens.add({ targets: container, scale: 0.93, duration: 65, yoyo: true });
       onClick();
@@ -2056,44 +2206,93 @@ export default class GameScene extends Phaser.Scene {
     this.matter.world.pause();
 
     const overlay = this.add
-      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.78)
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.72)
       .setDepth(30)
       .setInteractive();
 
-    const card = this.add
-      .container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
-      .setDepth(35)
-      .setScale(0.75)
-      .setAlpha(0);
-
-    const cardBg = this.add.graphics();
-    cardBg.fillStyle(0x1b1e3f, 1);
-    cardBg.fillRoundedRect(-175, -245, 350, 490, 24);
-    cardBg.lineStyle(2.5, 0x8ecae6, 0.75);
-    cardBg.strokeRoundedRect(-175, -245, 350, 490, 24);
-
-    const title = this.add
-      .text(0, -206, t('settingsTitle'), {
-        fontFamily: FONT_FAMILY,
-        fontSize: '22px',
-        fontStyle: 'bold',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-
+    let card = null;
     const closeModal = () => {
+      if (!this.settingsOpen) return;
       overlay.destroy();
-      card.destroy();
+      card?.destroy();
       this.settingsOpen = false;
       this.canDrop = true;
       this.matter.world.resume();
     };
 
-    // 1. Game Mode Switcher (Levels vs Endless)
+    // Non-blocking: tap outside card to close
+    overlay.on('pointerdown', closeModal);
+
+    card = this.createHybridModalCard(348, 368, 0x8ecae6, t('settingsTitle'), {
+      onClose: closeModal,
+      ribbonColor: 0x4361ee,
+      titleColor: '#ffffff',
+    });
+
+    // Helper for 2-column tactile toggle tile (Sound / Haptics)
+    const makeToggleTile = (x, y, icon, isOnInit, onToggle) => {
+      const cont = this.add.container(x, y);
+      const w = 136;
+      const h = 62;
+      const bg = this.add.graphics();
+      const iconTxt = this.add.text(0, -11, icon, { fontSize: '22px' }).setOrigin(0.5);
+      const stateTxt = this.add
+        .text(0, 14, '', {
+          fontFamily: FONT_FAMILY,
+          fontSize: '12px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+        })
+        .setOrigin(0.5);
+
+      const redraw = (isOn) => {
+        bg.clear();
+        bg.fillStyle(0x000000, 0.35);
+        bg.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 18);
+        bg.fillStyle(isOn ? 0x06d6a0 : 0x2b2d42, 1);
+        bg.fillRoundedRect(-w / 2, -h / 2, w, h, 18);
+        bg.fillStyle(0xffffff, 0.2);
+        bg.fillRoundedRect(-w / 2 + 8, -h / 2 + 3, w - 16, 14, 7);
+        bg.lineStyle(2, isOn ? 0xffffff : 0x6c757d, isOn ? 0.8 : 0.6);
+        bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 18);
+        stateTxt.setText(isOn ? t('on') : t('off'));
+        stateTxt.setColor(isOn ? '#0b132b' : '#cbd5ff');
+      };
+      redraw(isOnInit);
+
+      const zone = this.add.zone(0, 0, w, h).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', (pointer) => {
+        pointer.event?.stopPropagation?.();
+        soundFX.playClick();
+        this.tweens.add({ targets: cont, scale: 0.92, duration: 60, yoyo: true });
+        redraw(onToggle());
+      });
+
+      cont.add([bg, iconTxt, stateTxt, zone]);
+      return cont;
+    };
+
+    // 1. Side-by-side Sound & Haptics Toggles
+    const soundTile = makeToggleTile(-72, -108, soundFX.muted ? '🔇' : '🔊', !soundFX.muted, () => {
+      const muted = soundFX.toggleMute();
+      this.muteBtn.setText(muted ? '🔇' : '🔊');
+      soundTile.getAt(1).setText(muted ? '🔇' : '🔊');
+      return !muted;
+    });
+
+    const hapticsTile = makeToggleTile(72, -108, '📳', storageManager.isHapticsEnabled(), () => {
+      const next = !storageManager.isHapticsEnabled();
+      storageManager.setHapticsEnabled(next);
+      haptics.setEnabled(next);
+      if (next) haptics.drop();
+      return next;
+    });
+
+    // 2. Game Mode Switcher (Levels vs Endless)
     const isLevels = storageManager.getGameMode() === 'levels';
     const modeBtn = this.makeModalButton(
       0,
-      -140,
+      -34,
       `${t('modeSwitchTitle')} : ${isLevels ? t('modeLevels') : t('modeEndless')}`,
       0xff9f1c,
       '#0b132b',
@@ -2102,44 +2301,16 @@ export default class GameScene extends Phaser.Scene {
         storageManager.setGameMode(nextMode);
         closeModal();
         this.scene.restart();
-      }
+      },
+      280,
+      48
     );
 
-    // 2. Sound Toggle
-    const soundBtn = this.makeModalButton(
-      0,
-      -78,
-      `${t('soundLabel')} : ${soundFX.muted ? t('off') : t('on')}`,
-      0x3a0ca3,
-      '#ffffff',
-      () => {
-        const muted = soundFX.toggleMute();
-        this.muteBtn.setText(muted ? '🔇' : '🔊');
-        soundBtn.getAt(1).setText(`${t('soundLabel')} : ${muted ? t('off') : t('on')}`);
-      }
-    );
-
-    // 3. Haptics / Vibration Toggle
-    const hapticsBtn = this.makeModalButton(
-      0,
-      -16,
-      `${t('hapticsLabel')} : ${storageManager.isHapticsEnabled() ? t('on') : t('off')}`,
-      0x4361ee,
-      '#ffffff',
-      () => {
-        const next = !storageManager.isHapticsEnabled();
-        storageManager.setHapticsEnabled(next);
-        haptics.setEnabled(next);
-        if (next) haptics.drop();
-        hapticsBtn.getAt(1).setText(`${t('hapticsLabel')} : ${next ? t('on') : t('off')}`);
-      }
-    );
-
-    // 4. Language Cycler (FR -> EN -> DE -> JA -> AR)
+    // 3. Language Cycler (FR -> EN -> DE -> JA -> AR)
     const curLangObj = SUPPORTED_LANGS.find((l) => l.code === storageManager.getLang()) || SUPPORTED_LANGS[0];
     const langBtn = this.makeModalButton(
       0,
-      46,
+      30,
       `${t('langLabel')} : ${curLangObj.label}`,
       0x7209b7,
       '#ffffff',
@@ -2149,22 +2320,32 @@ export default class GameScene extends Phaser.Scene {
         storageManager.setLang(nextLang.code);
         closeModal();
         this.scene.restart();
-      }
+      },
+      280,
+      48
     );
 
-    // 5. Privacy (RGPD)
-    const privacyBtn = this.makeModalButton(0, 108, '🔒  RGPD / PRIVACY', 0x2b2d42, '#ffffff', () => {
-      if (!adManager.isNative()) {
-        this.showToast('🔒 Android only');
-        return;
-      }
-      adManager.showPrivacyOptions();
-    });
+    // 4. Side-by-side Privacy & Resume
+    const privacyBtn = this.makeModalButton(
+      -72,
+      106,
+      '🔒 RGPD',
+      0x2b2d42,
+      '#ffffff',
+      () => {
+        if (!adManager.isNative()) {
+          this.showToast('🔒 Android only');
+          return;
+        }
+        adManager.showPrivacyOptions();
+      },
+      134,
+      46
+    );
 
-    // 6. Close / Resume
-    const resumeBtn = this.makeModalButton(0, 174, `▶  ${t('close')}`, 0x06d6a0, '#0b132b', closeModal);
+    const resumeBtn = this.makeModalButton(72, 106, `▶ ${t('close')}`, 0x06d6a0, '#0b132b', closeModal, 134, 46);
 
-    card.add([cardBg, title, modeBtn, soundBtn, hapticsBtn, langBtn, privacyBtn, resumeBtn]);
+    card.add([soundTile, hapticsTile, modeBtn, langBtn, privacyBtn, resumeBtn]);
 
     this.tweens.add({
       targets: card,
@@ -2216,30 +2397,37 @@ export default class GameScene extends Phaser.Scene {
     this.matter.world.pause();
 
     const overlay = this.add
-      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.8)
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x090a1a, 0.72)
       .setDepth(30)
       .setInteractive();
 
-    const card = this.add
-      .container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
-      .setDepth(35)
-      .setScale(0.75)
-      .setAlpha(0);
+    let card = null;
+    const closeModal = () => {
+      if (!this.settingsOpen) return;
+      overlay.destroy();
+      card?.destroy();
+      this.settingsOpen = false;
+      this.canDrop = true;
+      this.matter.world.resume();
+    };
 
-    const cardBg = this.add.graphics();
-    cardBg.fillStyle(0x1b1e3f, 1);
-    cardBg.fillRoundedRect(-192, -268, 384, 536, 26);
-    cardBg.lineStyle(3, 0xffd166, 0.85);
-    cardBg.strokeRoundedRect(-192, -268, 384, 536, 26);
+    // Non-blocking: tap outside card to close
+    overlay.on('pointerdown', closeModal);
 
-    // 3 Spacious Tabs at the top
+    card = this.createHybridModalCard(384, 536, 0xffd166, t('modalTitle'), {
+      onClose: closeModal,
+      ribbonColor: 0x7209b7,
+      titleColor: '#ffd166',
+    });
+
+    // 3 Spacious 3D Tabs below ribbon
     let activeTab = 'quests';
     const questsGroup = this.add.container(0, 0);
     const leagueGroup = this.add.container(0, 0).setVisible(false);
     const themesGroup = this.add.container(0, 0).setVisible(false);
 
     const makeTab = (x, labelText, tabKey) => {
-      const tCont = this.add.container(x, -222);
+      const tCont = this.add.container(x, -214);
       const bg = this.add.graphics();
       const txt = this.add
         .text(0, 0, labelText, {
@@ -2268,10 +2456,12 @@ export default class GameScene extends Phaser.Scene {
       [tab1, tab2, tab3].forEach(({ bg, txt, tabKey }) => {
         const isOn = activeTab === tabKey;
         bg.clear();
+        bg.fillStyle(0x000000, 0.3);
+        bg.fillRoundedRect(-56, -16, 112, 36, 18);
         bg.fillStyle(isOn ? 0xff9f1c : 0x262b59, 1);
-        bg.fillRoundedRect(-56, -19, 112, 38, 19);
+        bg.fillRoundedRect(-56, -19, 112, 36, 18);
         bg.lineStyle(2, isOn ? 0xfff3b0 : 0x4a528a, isOn ? 1 : 0.6);
-        bg.strokeRoundedRect(-56, -19, 112, 38, 19);
+        bg.strokeRoundedRect(-56, -19, 112, 36, 18);
         txt.setColor(isOn ? '#0b132b' : '#cbd5ff');
       });
       questsGroup.setVisible(activeTab === 'quests');
@@ -2486,17 +2676,9 @@ export default class GameScene extends Phaser.Scene {
     refreshThemes();
     themesGroup.add(themeObjs.map((o) => o.tContainer));
 
-    const closeModal = () => {
-      overlay.destroy();
-      card.destroy();
-      this.settingsOpen = false;
-      this.canDrop = true;
-      this.matter.world.resume();
-    };
+    const closeBtn = this.makeModalButton(0, 218, `▶  ${t('close')}`, 0x06d6a0, '#0b132b', closeModal, 220, 44);
 
-    const closeBtn = this.makeModalButton(0, 218, `▶  ${t('close')}`, 0x06d6a0, '#0b132b', closeModal);
-
-    card.add([cardBg, tab1.tCont, tab2.tCont, tab3.tCont, questsGroup, leagueGroup, themesGroup, closeBtn]);
+    card.add([tab1.tCont, tab2.tCont, tab3.tCont, questsGroup, leagueGroup, themesGroup, closeBtn]);
 
     this.tweens.add({
       targets: card,
