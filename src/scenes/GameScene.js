@@ -1712,7 +1712,7 @@ export default class GameScene extends Phaser.Scene {
       settledCount += 1;
 
       const tier = fruit.getData('tier');
-      const r = FRUITS[tier].radius;
+      const r = fruit.getData('isRainbow') ? 24 : (FRUITS[tier]?.radius ?? 24);
       if (fruit.y - r < DANGER_Y) {
         overflowing = true;
         highRisk = true;
@@ -1996,6 +1996,7 @@ export default class GameScene extends Phaser.Scene {
       const a = this.fruits[i];
       if (!a.active) continue;
       const tierA = a.getData('tier');
+      if (tierA === undefined) continue;
       for (let j = i + 1; j < this.fruits.length; j += 1) {
         const b = this.fruits[j];
         if (!b.active) continue;
@@ -2103,7 +2104,7 @@ export default class GameScene extends Phaser.Scene {
     for (const fruit of this.fruits) {
       if (!fruit.active) continue;
       const tier = fruit.getData('tier');
-      const r = FRUITS[tier].radius;
+      const r = fruit.getData('isRainbow') ? 24 : (FRUITS[tier]?.radius ?? 24);
       const d = Phaser.Math.Distance.Between(px, py, fruit.x, fruit.y);
       if (d <= r + 14 && d < minDist) {
         minDist = d;
