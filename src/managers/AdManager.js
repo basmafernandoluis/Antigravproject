@@ -187,6 +187,7 @@ class AdManager {
     let safetyTimer = null;
     let postRewardTimer = null;
     let hadError = false;
+    let closeReason = 'unknown';
 
     try {
       if (!this.rewardedReady) {
@@ -201,21 +202,21 @@ class AdManager {
       let closed = false;
       let resolveClosed;
       const closedPromise = new Promise((resolve) => {
-        resolveClosed = () => {
+        resolveClosed = (reason = 'unknown') => {
           if (closed) return;
           closed = true;
+          closeReason = reason;
           resolve();
         };
       });
 
-      const markEarned = (reward) => {
+      const markEarned = (reward, source) => {
+        console.info('[AdManager] Reward earned via', source, reward);
         if (!earnedReward) {
           earnedReward = reward || { type: 'reward', amount: 1 };
         }
-        // Hard cap: if Dismissed event is swallowed by WebView on some Android devices,
-        // still resume & grant reward within 1.5s of earning it.
         if (!postRewardTimer) {
-          postRewardTimer = setTimeout(resolveClosed, 1500);
+          postRewardTimer = setTimeout(() => resolveClosed('post_reward_timer'), 1500);
         }
       };
 
@@ -223,13 +224,13 @@ class AdManager {
       let sawBackground = false;
 
       rewardHandle = await AdMob.addListener(RewardAdPluginEvents.Rewarded, (reward) => {
-        markEarned(reward);
+        markEarned(reward, 'event_Rewarded');
       });
       dismissHandle = await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
-        resolveClosed();
+        resolveClosed('event_Dismissed');
       });
       failHandle = await AdMob.addListener(RewardAdPluginEvents.FailedToShow, () => {
-        resolveClosed();
+        resolveClosed('event_FailedToShow');
       });
 
       // Fallbacks when returning from native AdActivity
@@ -237,7 +238,7 @@ class AdManager {
         if (!isActive) {
           sawBackground = true;
         } else if (sawBackground || Date.now() - adShownAt > 800) {
-          setTimeout(resolveClosed, 200);
+          setTimeout(() => resolveClosed('appStateChange'), 250);
         }
       });
 
@@ -245,40 +246,44 @@ class AdManager {
         if (document.hidden) {
           sawBackground = true;
         } else if (sawBackground || Date.now() - adShownAt > 800) {
-          setTimeout(resolveClosed, 200);
+          setTimeout(() => resolveClosed('visibilitychange'), 250);
         }
       };
       document.addEventListener('visibilitychange', onVisibility);
 
       onFocus = () => {
         if (Date.now() - adShownAt > 800) {
-          setTimeout(resolveClosed, 200);
+          setTimeout(() => resolveClosed('window_focus'), 250);
         }
       };
       window.addEventListener('focus', onFocus);
 
-      // Do not await showRewardVideoAd alone because closing early never resolves/rejects it on Android
+      console.info('[AdManager] Calling AdMob.showRewardVideoAd()');
       AdMob.showRewardVideoAd()
         .then((rewardItem) => {
+          console.info('[AdManager] showRewardVideoAd resolved:', rewardItem);
           if (rewardItem) {
-            markEarned(rewardItem);
+            markEarned(rewardItem, 'promise_resolve');
           }
         })
         .catch((err) => {
           console.warn('[AdManager] showRewardVideoAd rejected:', err);
-          resolveClosed();
+          resolveClosed('promise_rejected');
         });
 
       await Promise.race([
         closedPromise,
         new Promise((resolve) => {
-          safetyTimer = setTimeout(resolve, 90000);
+          safetyTimer = setTimeout(() => {
+            closeReason = 'safety_timeout';
+            resolve();
+          }, 90000);
         }),
       ]);
 
-      // Give Capacitor bridge 350ms to flush Rewarded if Dismissed/Resume arrived first
+      // Give Capacitor bridge up to 800ms to flush Rewarded if Dismissed/Focus arrived first
       if (!earnedReward) {
-        await new Promise((resolve) => setTimeout(resolve, 350));
+        await new Promise((resolve) => setTimeout(resolve, 800));
       }
 
       if (earnedReward) {
@@ -303,11 +308,12 @@ class AdManager {
       if (onFocus) window.removeEventListener('focus', onFocus);
       this.isShowingAd = false;
       this.preloadRewarded();
+      console.info('[AdManager] Rewarded finally:', { earned: !!earnedReward, hadError, closeReason });
       onDismiss?.();
       if (earnedReward) {
         onReward?.(earnedReward);
       } else if (!hadError) {
-        onNoReward?.();
+        onNoReward?.(closeReason);
       }
     }
     return true;

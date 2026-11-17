@@ -1681,7 +1681,7 @@ export default class GameScene extends Phaser.Scene {
       onStart: () => this.pauseForAd(),
       onReward: () => this._executeShake(),
       onDismiss: () => this.resumeFromAd(),
-      onNoReward: () => this.showToast('⚠️ Pub fermée trop tôt'),
+      onNoReward: (reason) => this.showToast(`⚠️ Pub fermée (${reason})`),
       onError: () => this.showToast('⚠️ Pub indisponible'),
     });
   }
@@ -1707,7 +1707,7 @@ export default class GameScene extends Phaser.Scene {
       onStart: () => this.pauseForAd(),
       onReward: () => this._executePin(),
       onDismiss: () => this.resumeFromAd(),
-      onNoReward: () => this.showToast('⚠️ Pub fermée trop tôt'),
+      onNoReward: (reason) => this.showToast(`⚠️ Pub fermée (${reason})`),
       onError: () => this.showToast('⚠️ Pub indisponible'),
     });
   }
@@ -2177,16 +2177,18 @@ export default class GameScene extends Phaser.Scene {
 
   showToast(message) {
     const toast = this.add
-      .text(GAME_WIDTH / 2, JAR_BOTTOM - 40, message, {
+      .text(GAME_WIDTH / 2, 200, message, {
         fontFamily: FONT_FAMILY,
-        fontSize: '13px',
+        fontSize: '15px',
         fontStyle: 'bold',
-        color: '#ffffff',
+        color: '#ffd166',
         backgroundColor: '#1b1e3f',
-        padding: { x: 14, y: 8 },
+        stroke: '#0b0824',
+        strokeThickness: 3,
+        padding: { x: 16, y: 9 },
       })
       .setOrigin(0.5)
-      .setDepth(40)
+      .setDepth(60)
       .setAlpha(0);
 
     this.tweens.add({
@@ -2195,7 +2197,7 @@ export default class GameScene extends Phaser.Scene {
       y: toast.y - 10,
       duration: 180,
       onComplete: () => {
-        this.time.delayedCall(1500, () => {
+        this.time.delayedCall(2200, () => {
           this.tweens.add({
             targets: toast,
             alpha: 0,
