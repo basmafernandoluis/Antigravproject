@@ -328,6 +328,9 @@ DICT.fr.youLabel = 'TOI';
 DICT.fr.newFruitBanner = '🌟 NOUVEAU FRUIT : {fruit} !';
 DICT.fr.quitBtn = '🚪  QUITTER';
 DICT.fr.adBadge = 'PUB';
+DICT.fr.musicShort = 'MUSIQUE';
+DICT.fr.sfxShort = 'EFFETS';
+DICT.fr.vibShort = 'VIBR.';
 
 DICT.en.activeTheme = '✓ ACTIVE';
 DICT.en.tapToUse = 'Tap to equip';
@@ -335,6 +338,9 @@ DICT.en.youLabel = 'YOU';
 DICT.en.newFruitBanner = '🌟 NEW FRUIT: {fruit}!';
 DICT.en.quitBtn = '🚪  QUIT';
 DICT.en.adBadge = 'AD';
+DICT.en.musicShort = 'MUSIC';
+DICT.en.sfxShort = 'SFX';
+DICT.en.vibShort = 'HAPTICS';
 
 DICT.de.activeTheme = '✓ AKTIV';
 DICT.de.tapToUse = 'Tippen zum Aktivieren';
@@ -342,6 +348,9 @@ DICT.de.youLabel = 'DU';
 DICT.de.newFruitBanner = '🌟 NEUE FRUCHT: {fruit}!';
 DICT.de.quitBtn = '🚪  BEENDEN';
 DICT.de.adBadge = 'WERB.';
+DICT.de.musicShort = 'MUSIK';
+DICT.de.sfxShort = 'TON';
+DICT.de.vibShort = 'VIBR.';
 
 DICT.ja.activeTheme = '✓ 使用中';
 DICT.ja.tapToUse = 'タップで変更';
@@ -349,9 +358,15 @@ DICT.ja.youLabel = 'あなた';
 DICT.ja.newFruitBanner = '🌟 新フルーツ: {fruit}！';
 DICT.ja.quitBtn = '🚪  おわる';
 DICT.ja.adBadge = '広告';
+DICT.ja.musicShort = 'おんがく';
+DICT.ja.sfxShort = 'こうかおん';
+DICT.ja.vibShort = 'しんどう';
 
 DICT.ar.quitBtn = '🚪  خروج';
 DICT.ar.adBadge = 'إعلان';
+DICT.ar.musicShort = 'موسيقى';
+DICT.ar.sfxShort = 'مؤثرات';
+DICT.ar.vibShort = 'اهتزاز';
 
 export function detectSystemLang() {
   if (typeof navigator === 'undefined') return 'en';

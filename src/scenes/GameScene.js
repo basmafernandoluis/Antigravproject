@@ -346,9 +346,17 @@ export default class GameScene extends Phaser.Scene {
     trophyObj.container.add(this.questBadgeDot);
     this.refreshQuestBadge();
 
-    const muteObj = makeIconBtn(GAME_WIDTH - 92, 40, soundFX.muted ? '🔇' : '🔊', 0x4361ee, 0x243496, (txt) => {
-      const muted = soundFX.toggleMute();
-      txt.setText(muted ? '🔇' : '🔊');
+    soundFX.setSfxEnabled(storageManager.isSfxEnabled());
+    soundFX.setMusicEnabled(storageManager.isMusicEnabled());
+    const isAllMuted = soundFX.muted && !soundFX.musicEnabled;
+
+    const muteObj = makeIconBtn(GAME_WIDTH - 92, 40, isAllMuted ? '🔇' : '🔊', 0x4361ee, 0x243496, (txt) => {
+      const nextMuted = !(soundFX.muted && !soundFX.musicEnabled);
+      soundFX.setSfxEnabled(!nextMuted);
+      soundFX.setMusicEnabled(!nextMuted);
+      storageManager.setSfxEnabled(!nextMuted);
+      storageManager.setMusicEnabled(!nextMuted);
+      txt.setText(nextMuted ? '🔇' : '🔊');
     });
     this.muteBtn = muteObj.txt;
 
@@ -1740,17 +1748,14 @@ export default class GameScene extends Phaser.Scene {
   pauseForAd() {
     this.isPausedForAd = true;
     this.matter.world.pause();
-    this.wasMutedBeforeAd = soundFX.muted;
-    if (!this.wasMutedBeforeAd) {
-      soundFX.muted = true;
-    }
+    soundFX.pauseAllForAd();
   }
 
   resumeFromAd() {
     this.isPausedForAd = false;
     this.dangerTimer = 0;
     this.matter.world.resume();
-    soundFX.muted = this.wasMutedBeforeAd ?? false;
+    soundFX.resumeAllFromAd();
   }
 
   _executeShake() {
@@ -2327,17 +2332,25 @@ export default class GameScene extends Phaser.Scene {
       titleColor: '#ffffff',
     });
 
-    // Helper for 2-column tactile toggle tile (Sound / Haptics)
-    const makeToggleTile = (x, y, icon, isOnInit, onToggle) => {
+    // Helper for 3-column tactile toggle tile (Music / SFX / Haptics)
+    const makeToggleTile = (x, y, icon, label, isOnInit, onToggle) => {
       const cont = this.add.container(x, y);
-      const w = 136;
-      const h = 62;
+      const w = 90;
+      const h = 64;
       const bg = this.add.graphics();
-      const iconTxt = this.add.text(0, -11, icon, { fontSize: '22px' }).setOrigin(0.5);
-      const stateTxt = this.add
-        .text(0, 14, '', {
+      const iconTxt = this.add.text(0, -14, icon, { fontSize: '20px' }).setOrigin(0.5);
+      const lblTxt = this.add
+        .text(0, 6, label, {
           fontFamily: FONT_FAMILY,
-          fontSize: '12px',
+          fontSize: '10px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+        })
+        .setOrigin(0.5);
+      const stateTxt = this.add
+        .text(0, 21, '', {
+          fontFamily: FONT_FAMILY,
+          fontSize: '10px',
           fontStyle: 'bold',
           color: '#ffffff',
         })
@@ -2346,15 +2359,16 @@ export default class GameScene extends Phaser.Scene {
       const redraw = (isOn) => {
         bg.clear();
         bg.fillStyle(0x000000, 0.35);
-        bg.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 18);
+        bg.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 16);
         bg.fillStyle(isOn ? 0x06d6a0 : 0x2b2d42, 1);
-        bg.fillRoundedRect(-w / 2, -h / 2, w, h, 18);
+        bg.fillRoundedRect(-w / 2, -h / 2, w, h, 16);
         bg.fillStyle(0xffffff, 0.2);
-        bg.fillRoundedRect(-w / 2 + 8, -h / 2 + 3, w - 16, 14, 7);
+        bg.fillRoundedRect(-w / 2 + 6, -h / 2 + 3, w - 12, 12, 6);
         bg.lineStyle(2, isOn ? 0xffffff : 0x6c757d, isOn ? 0.8 : 0.6);
-        bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 18);
+        bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 16);
+        lblTxt.setColor(isOn ? '#0b132b' : '#cbd5ff');
         stateTxt.setText(isOn ? t('on') : t('off'));
-        stateTxt.setColor(isOn ? '#0b132b' : '#cbd5ff');
+        stateTxt.setColor(isOn ? '#0b132b' : '#94a3b8');
       };
       redraw(isOnInit);
 
@@ -2366,19 +2380,41 @@ export default class GameScene extends Phaser.Scene {
         redraw(onToggle());
       });
 
-      cont.add([bg, iconTxt, stateTxt, zone]);
+      cont.add([bg, iconTxt, lblTxt, stateTxt, zone]);
       return cont;
     };
 
-    // 1. Side-by-side Sound & Haptics Toggles
-    const soundTile = makeToggleTile(-72, -108, soundFX.muted ? '🔇' : '🔊', !soundFX.muted, () => {
-      const muted = soundFX.toggleMute();
-      this.muteBtn.setText(muted ? '🔇' : '🔊');
-      soundTile.getAt(1).setText(muted ? '🔇' : '🔊');
-      return !muted;
+    const syncTopMuteIcon = () => {
+      const allMuted = !soundFX.musicEnabled && soundFX.muted;
+      this.muteBtn?.setText(allMuted ? '🔇' : '🔊');
+    };
+
+    // 1. 3-column Music, SFX & Haptics Toggles
+    const musicTile = makeToggleTile(-96, -108, '🎵', t('musicShort'), storageManager.isMusicEnabled(), () => {
+      const next = !storageManager.isMusicEnabled();
+      storageManager.setMusicEnabled(next);
+      soundFX.setMusicEnabled(next);
+      syncTopMuteIcon();
+      return next;
     });
 
-    const hapticsTile = makeToggleTile(72, -108, '📳', storageManager.isHapticsEnabled(), () => {
+    const sfxTile = makeToggleTile(
+      0,
+      -108,
+      soundFX.muted ? '🔇' : '🔊',
+      t('sfxShort'),
+      storageManager.isSfxEnabled(),
+      () => {
+        const next = !storageManager.isSfxEnabled();
+        storageManager.setSfxEnabled(next);
+        soundFX.setSfxEnabled(next);
+        sfxTile.getAt(1).setText(next ? '🔊' : '🔇');
+        syncTopMuteIcon();
+        return next;
+      }
+    );
+
+    const hapticsTile = makeToggleTile(96, -108, '📳', t('vibShort'), storageManager.isHapticsEnabled(), () => {
       const next = !storageManager.isHapticsEnabled();
       storageManager.setHapticsEnabled(next);
       haptics.setEnabled(next);
@@ -2443,7 +2479,7 @@ export default class GameScene extends Phaser.Scene {
 
     const resumeBtn = this.makeModalButton(72, 106, `▶ ${t('close')}`, 0x06d6a0, '#0b132b', closeModal, 134, 46);
 
-    card.add([soundTile, hapticsTile, modeBtn, langBtn, privacyBtn, resumeBtn]);
+    card.add([musicTile, sfxTile, hapticsTile, modeBtn, langBtn, privacyBtn, resumeBtn]);
 
     this.tweens.add({
       targets: card,

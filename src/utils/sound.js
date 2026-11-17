@@ -1,11 +1,40 @@
+// Relaxed 4-bar Cmaj7 -> Am7 -> Fmaj7 -> G6 casual marimba loop (frequencies in Hz)
+const BGM_BASS = [
+  130.81, 0, 0, 0, 196.0, 0, 0, 0, // C3 -> G3
+  110.0, 0, 0, 0, 164.81, 0, 0, 0, // A2 -> E3
+  87.31, 0, 0, 0, 130.81, 0, 0, 0, // F2 -> C3
+  98.0, 0, 0, 0, 146.83, 0, 0, 0, // G2 -> D3
+];
+
+const BGM_MELODY = [
+  523.25, 0, 659.25, 783.99, 0, 659.25, 587.33, 0, // C5 E5 G5 E5 D5
+  440.0, 0, 523.25, 659.25, 0, 523.25, 493.88, 0, // A4 C5 E5 C5 B4
+  349.23, 0, 440.0, 523.25, 0, 659.25, 523.25, 0, // F4 A4 C5 E5 C5
+  392.0, 0, 493.88, 587.33, 0, 659.25, 587.33, 0, // G4 B4 D5 E5 D5
+];
+
 class SoundFX {
   constructor() {
     this.ctx = null;
-    this.muted = false;
+    this.muted = false; // SFX mute
+    this.musicEnabled = true;
+    this.musicPaused = false;
+    this.musicTimer = null;
+    this.musicStep = 0;
+    this.musicGain = null;
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          this.stopMusicLoop();
+        } else if (this.musicEnabled && !this.musicPaused) {
+          this.startMusicLoop();
+        }
+      });
+    }
   }
 
-  ensureContext() {
-    if (this.muted) return null;
+  _initContext() {
     if (!this.ctx && typeof window !== 'undefined') {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
@@ -15,7 +44,118 @@ class SoundFX {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
+    if (this.ctx && !this.musicGain) {
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.value = this.musicEnabled && !this.musicPaused ? 0.55 : 0;
+      this.musicGain.connect(this.ctx.destination);
+    }
+    if (this.ctx && this.musicEnabled && !this.musicPaused && !this.musicTimer) {
+      this.startMusicLoop();
+    }
     return this.ctx;
+  }
+
+  ensureContext() {
+    const ctx = this._initContext();
+    if (this.muted) return null;
+    return ctx;
+  }
+
+  setSfxEnabled(enabled) {
+    this.muted = !enabled;
+    return !this.muted;
+  }
+
+  setMusicEnabled(enabled) {
+    this.musicEnabled = Boolean(enabled);
+    if (this.musicGain && this.ctx) {
+      this.musicGain.gain.setTargetAtTime(
+        this.musicEnabled && !this.musicPaused ? 0.55 : 0,
+        this.ctx.currentTime,
+        0.05
+      );
+    }
+    if (this.musicEnabled && !this.musicPaused) {
+      this._initContext();
+      this.startMusicLoop();
+    } else {
+      this.stopMusicLoop();
+    }
+    return this.musicEnabled;
+  }
+
+  pauseAllForAd() {
+    this.wasSfxMutedBeforeAd = this.muted;
+    this.muted = true;
+    this.musicPaused = true;
+    this.stopMusicLoop();
+    if (this.musicGain && this.ctx) {
+      this.musicGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.02);
+    }
+  }
+
+  resumeAllFromAd() {
+    this.muted = this.wasSfxMutedBeforeAd ?? false;
+    this.musicPaused = false;
+    if (this.musicGain && this.ctx) {
+      this.musicGain.gain.setTargetAtTime(this.musicEnabled ? 0.55 : 0, this.ctx.currentTime, 0.05);
+    }
+    if (this.musicEnabled) {
+      this.startMusicLoop();
+    }
+  }
+
+  startMusicLoop() {
+    if (this.musicTimer || !this.musicEnabled || this.musicPaused) return;
+    if (!this.ctx || !this.musicGain) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+
+    const stepMs = 320; // ~93 BPM eighth notes
+    const tick = () => {
+      if (!this.musicEnabled || this.musicPaused || !this.ctx || this.ctx.state !== 'running') return;
+      const idx = this.musicStep % BGM_MELODY.length;
+      this.musicStep += 1;
+
+      const now = this.ctx.currentTime;
+      const bassFreq = BGM_BASS[idx];
+      if (bassFreq > 0) {
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(bassFreq, now);
+        g.gain.setValueAtTime(0.001, now);
+        g.gain.linearRampToValueAtTime(0.045, now + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0008, now + 0.58);
+        osc.connect(g);
+        g.connect(this.musicGain);
+        osc.start(now);
+        osc.stop(now + 0.6);
+      }
+
+      const melFreq = BGM_MELODY[idx];
+      if (melFreq > 0) {
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(melFreq, now);
+        g.gain.setValueAtTime(0.001, now);
+        g.gain.linearRampToValueAtTime(0.032, now + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0008, now + 0.28);
+        osc.connect(g);
+        g.connect(this.musicGain);
+        osc.start(now);
+        osc.stop(now + 0.3);
+      }
+    };
+
+    this.musicTimer = setInterval(tick, stepMs);
+  }
+
+  stopMusicLoop() {
+    if (this.musicTimer) {
+      clearInterval(this.musicTimer);
+      this.musicTimer = null;
+    }
   }
 
   toggleMute() {

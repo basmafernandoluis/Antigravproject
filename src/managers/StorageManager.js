@@ -17,6 +17,8 @@ const DEFAULT_DATA = {
   lang: '',
   langManual: false,
   hapticsEnabled: true,
+  musicEnabled: true,
+  sfxEnabled: true,
   gameMode: 'levels',
   campaignLevel: 1,
   levelStars: {},
@@ -98,6 +100,24 @@ class StorageManager {
 
   setHapticsEnabled(val) {
     this.data.hapticsEnabled = Boolean(val);
+    this.save();
+  }
+
+  isMusicEnabled() {
+    return this.data.musicEnabled !== false;
+  }
+
+  setMusicEnabled(val) {
+    this.data.musicEnabled = Boolean(val);
+    this.save();
+  }
+
+  isSfxEnabled() {
+    return this.data.sfxEnabled !== false;
+  }
+
+  setSfxEnabled(val) {
+    this.data.sfxEnabled = Boolean(val);
     this.save();
   }
 
