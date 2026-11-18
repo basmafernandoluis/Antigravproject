@@ -78,19 +78,25 @@
   <main class="container">
     <span class="badge">Juicy Drop (com.appwizards.juicydrop)</span>
     <h1>Règles de confidentialité / Privacy Policy</h1>
-    <p class="subtitle">Dernière mise à jour : 15 novembre 2026 — Éditeur : AppWizards</p>
+    <p class="subtitle">Dernière mise à jour : 18 novembre 2026 — Éditeur : AppWizards</p>
 
     <p>
       La présente politique de confidentialité explique comment l'application mobile <strong>Juicy Drop</strong>
       (identifiant de package : <code>com.appwizards.juicydrop</code>) traite les informations lorsque vous utilisez le jeu.
     </p>
 
-    <h2>1. Aucune création de compte et stockage local</h2>
+    <h2>1. Aucune création de compte, stockage local et Firebase</h2>
     <p>
-      <strong>Juicy Drop</strong> ne nécessite aucune inscription ni connexion. Votre progression (meilleur score,
-      fruit maximal atteint, nombre de parties et préférences sonores) est enregistrée uniquement en local sur votre appareil
-      et n'est pas transmise à nos serveurs.
+      <strong>Juicy Drop</strong> ne nécessite aucune inscription nominative (pas d'e-mail ni de mot de passe). Vos préférences
+      (langue, audio, vibrations, thèmes et quêtes) sont enregistrées en local sur votre appareil.
     </p>
+    <p>
+      Pour le fonctionnement du classement en ligne et l'amélioration du jeu, l'application utilise les services <strong>Google Firebase</strong> (Google LLC) :
+    </p>
+    <ul>
+      <li><strong>Firebase Anonymous Auth &amp; Cloud Firestore</strong> : un identifiant technique anonyme et un pseudonyme généré automatiquement (ex. <code>Juicy#1234</code>), ainsi que votre meilleur score et votre niveau de campagne, sont enregistrés de manière chiffrée (HTTPS) afin d'afficher le classement hebdomadaire.</li>
+      <li><strong>Firebase Analytics &amp; Remote Config</strong> : collecte des événements d'utilisation anonymisés (parties jouées, niveaux atteints, usage des boosters) et récupération de paramètres d'équilibrage à distance.</li>
+    </ul>
 
     <h2>2. Publicités et Google AdMob</h2>
     <p>
@@ -126,9 +132,10 @@
       <strong>Juicy Drop</strong> est destiné à un public âgé de <strong>13 ans et plus</strong>. Nous ne collectons pas sciemment de données personnelles auprès d'enfants de moins de 13 ans.
     </p>
 
-    <h2>5. Contact</h2>
+    <h2>5. Suppression des données et Contact</h2>
     <p>
-      Pour toute question concernant ces règles de confidentialité ou vos données, vous pouvez nous contacter par e-mail à :
+      Pour toute question concernant ces règles de confidentialité ou pour demander la suppression de votre entrée de classement
+      associée à votre identifiant anonyme, vous pouvez nous contacter par e-mail à :
       <a href="mailto:basmafernandoluis@gmail.com">basmafernandoluis@gmail.com</a>.
     </p>
 
@@ -136,11 +143,11 @@
 
     <h2>English Summary</h2>
     <p>
-      <strong>Juicy Drop</strong> (<code>com.appwizards.juicydrop</code>) does not require user accounts and stores game progress locally on your device.
-      The app displays ads via <strong>Google AdMob</strong>, which may collect and process your Android Advertising ID, ad interaction data,
-      and device diagnostics over encrypted HTTPS connections. EU/UK/Swiss users can manage their ad consent anytime via
+      <strong>Juicy Drop</strong> (<code>com.appwizards.juicydrop</code>) does not require personal registration and stores preferences locally on your device.
+      It uses <strong>Google Firebase</strong> (Anonymous Auth, Cloud Firestore for the leaderboard using an anonymous ID, generated nickname, best score and campaign level, plus Firebase Analytics &amp; Remote Config)
+      and <strong>Google AdMob</strong> (Advertising ID, ad interactions, and diagnostics) over encrypted HTTPS connections. EU/UK/Swiss users can manage their ad consent anytime via
       <strong>Settings &rarr; Vie privée (RGPD)</strong> using Google UMP. Intended for users aged 13+.
-      Contact: <a href="mailto:basmafernandoluis@gmail.com">basmafernandoluis@gmail.com</a>.
+      Data deletion requests &amp; contact: <a href="mailto:basmafernandoluis@gmail.com">basmafernandoluis@gmail.com</a>.
     </p>
 
     <footer>
